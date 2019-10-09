@@ -1,0 +1,54 @@
+{
+	"commands": [
+		{
+			"cmd": "amirite",
+			"type": "reply",
+			"value": "Hell yeah you are, bruh."
+		},
+		{
+			"cmd": "compliment",
+			"type": "docreply",
+			"format": "Hey {user}! {value} :)",
+			"args": [ "user" ]
+		},
+		{
+			"cmd": "goodnight",
+			"type": "reply",
+			"value": "Goodnight, my friend."
+		},
+		{
+			"cmd": "help",
+			"type": "function",
+			"func": "Help",
+			"args": [ "<command>" ]
+		},
+		{
+			"cmd": "insult",
+			"type": "docreply",
+			"format": "Hey {user}! {value}",
+			"args": [ "user" ]
+		},
+		{
+			"cmd": "kill",
+			"type": "reply",
+			"value": "Hmm... As much as {user} deserves it, I think I'll let him live.",
+			"args": [ "user" ]
+		},
+		{
+			"cmd": "prod",
+			"type": "function",
+			"func": "SpamABitch",
+			"args": [ "user", "<num>", "<wait>" ]
+		},
+		{
+			"cmd": "stfu",
+			"type": "function",
+			"func": "Abort"
+		},
+		{
+			"cmd": "thanks",
+			"type": "reply",
+			"value": "You're welcome! :D <3"
+		}
+	]
+}
