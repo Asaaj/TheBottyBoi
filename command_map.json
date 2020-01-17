@@ -1,54 +1,94 @@
 {
 	"commands": [
 		{
-			"cmd": "amirite",
-			"type": "reply",
-			"value": "Hell yeah you are, bruh."
+			"cmd": "help",
+			"type": "function",
+			"args": [ "[command]" ],
+			"help": "Returns syntax for all publicly available commands."
+		},
+		{
+			"cmd": "stfu",
+			"type": "function",
+			"help": "Stops spam and noise functions."
+		},
+		{
+			"cmd": "stop",
+			"type": "function",
+			"func": "stfu",
+			"help": "Alias for `stfu`."
 		},
 		{
 			"cmd": "compliment",
 			"type": "docreply",
 			"format": "Hey {user}! {value} :)",
-			"args": [ "user" ]
-		},
-		{
-			"cmd": "goodnight",
-			"type": "reply",
-			"value": "Goodnight, my friend."
-		},
-		{
-			"cmd": "help",
-			"type": "function",
-			"func": "Help",
-			"args": [ "<command>" ]
+			"args": [ "user" ],
+			"help": "Compliments [user]."
 		},
 		{
 			"cmd": "insult",
 			"type": "docreply",
 			"format": "Hey {user}! {value}",
-			"args": [ "user" ]
-		},
-		{
-			"cmd": "kill",
-			"type": "reply",
-			"value": "Hmm... As much as {user} deserves it, I think I'll let him live.",
-			"args": [ "user" ]
+			"args": [ "user" ],
+			"help": "Insults [user]."
 		},
 		{
 			"cmd": "prod",
 			"type": "function",
-			"func": "SpamABitch",
-			"args": [ "user", "<num>", "<wait>" ]
+			"args": [ "user", "[num]", "[wait]" ],
+			"help": "Reminds [user] to join voice chat. Can provide the number of times to prod, and the time between the messages in seconds."
 		},
 		{
-			"cmd": "stfu",
+			"cmd": "stream",
 			"type": "function",
-			"func": "Abort"
+			"args": [ "url" ],
+			"requires_client": true,
+			"help": "Streams [url] from Youtube in your voice chat. If you're not in chat, I default to the chat with the most people."
+		},
+		{
+			"cmd": "volume",
+			"type": "function",
+			"args": [ "percent" ],
+			"requires_client": true,
+			"help": "Sets the volume of currently-streaming video, if there is one."
+		},
+
+
+		{
+			"cmd": "update",
+			"type": "function",
+			"requires_bot": true,
+			"hidden": true
+		},
+		{
+			"cmd": "kill",
+			"type": "reply",
+			"format": "Hmm... As much as {user} deserves it, I think I'll let him live.",
+			"args": [ "user" ],
+			"hidden": true
+		},
+		{
+			"cmd": "amirite",
+			"type": "reply",
+			"format": "Hell yeah you are, bruh.",
+			"hidden": true
+		},
+		{
+			"cmd": "goodnight",
+			"type": "reply",
+			"format": "Goodnight, my friend.",
+			"hidden": true
 		},
 		{
 			"cmd": "thanks",
 			"type": "reply",
-			"value": "You're welcome! :D <3"
+			"format": "You're welcome! :D <3",
+			"hidden": true
+		},
+		{
+			"cmd": "welcome back",
+			"type": "reply",
+			"format": "Thank you, glad to be here.",
+			"hidden": true
 		}
 	]
 }

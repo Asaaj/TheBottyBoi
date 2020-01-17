@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os
+import os, re
 
 class CommandStructure:
 	RecognizedTypes = [ 
@@ -11,16 +11,16 @@ class CommandStructure:
 
 	RequiredForAll = ["cmd", "type"]
 	RequiredFor = {
-		"docreply": [ ],
-		"function": [ "func" ],
-		"reply": [ "value" ]
-	}
-
-	OptionalForAll = [ "args" ]
-	OptionalFor = {
 		"docreply": [ "format" ],
 		"function": [ ],
 		"reply": [ "format" ]
+	}
+
+	OptionalForAll = [ "args", "hidden" ]
+	OptionalFor = {
+		"docreply": [ ],
+		"function": [ "requires_client", "requires_bot" ],
+		"reply": [ ]
 	}
 
 def ValidateDocReplyCmd(cmdDef):
@@ -30,9 +30,16 @@ def ValidateDocReplyCmd(cmdDef):
 	if not os.path.isfile(filePath):
 		raise IOError("File '{}' does not exist for command '{}'".format(filePath, command))
 
+def ValidateReplyCmd(cmdDef):
+	if "args" in cmdDef:
+		for arg in cmdDef["args"]:
+			if re.match(R"\[.*\]", arg):
+				raise AttributeError("Reply command '{}' has optional argument '{}'".format(cmdDef["cmd"], arg[1:-1]))
+
 class CommandMapValidator:
 	__specialValidators = {
-		"docreply": ValidateDocReplyCmd
+		"docreply": ValidateDocReplyCmd,
+		"reply": ValidateReplyCmd
 	}
 
 	def __Log(self, msg):
@@ -91,7 +98,7 @@ class CommandMapValidator:
 	def __ValidateOptional(self, cmdDef):
 		pass
 		# for attr in cmdDef.keys():
-		# 	if not attr in I'll come back to this later
+		# 	if not attr in ??
 
 	def __ValidateSpecial(self, cmdDef):
 		cmdType = cmdDef["type"]

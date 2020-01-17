@@ -1,27 +1,12 @@
 #!/usr/bin/python3
 
-import importlib
+import importlib, traceback
 
-from TheBottyBoi import TheBottyBoi
-ReloadableImports = [ TheBottyBoi ]
+import MessageSanitizer, Screamer, TheBottyBoi
+ReloadableImports = [ MessageSanitizer, Screamer, TheBottyBoi ]
 
-class MessageSanitizer:
-	def __init__(self, botId):
-		self.__botId = botId
-		self.__botMentions = [
-			"<@{}>".format(botId),
-			"<@!{}>".format(botId)
-		]
-
-	def StartsWithBotMention(self, content):
-		return any([content.strip().startswith(mention) for mention in self.__botMentions])
-
-	def RemoveBotMentionFromStart(self, content):
-		whichMentions = [i for i, m in enumerate(self.__botMentions) if content.startswith(m)]
-		return content[len(whichMentions) > 0 and len(self.__botMentions[whichMentions[0]]):].strip()
-
-	def SanitizeContent(self, content):
-		return self.RemoveBotMentionFromStart(content)
+## The only one who can send "reload" commands
+theMaster = "184456961255800832"
 
 class MaybeDidntLoad:
 	LoadIssue = None
@@ -29,22 +14,30 @@ class MaybeDidntLoad:
 		return self.LoadIssue
 
 class CommandDispatcher(MaybeDidntLoad):
-	def __init__(self, botId):
-		self.__sanitizer = MessageSanitizer(botId)
+	def __init__(self, botId, clientConnection):
+		self.__sanitizer = MessageSanitizer.MessageSanitizer(botId)
 		try:
-			self.__maBoi = TheBottyBoi(botId)
+			self.__maBoi = TheBottyBoi.TheBottyBoi(botId, clientConnection)
 		except Exception as e:
+			self.__maBoi = None
 			self.LoadIssue = e
 
-	def ShouldDispatchMessage(self, message):
-		return self.__sanitizer.StartsWithBotMention(message.content) or self.__maBoi.IsThisMessageSpecial(message)
+	async def Cleanup(self):
+		if self.__maBoi is not None:
+			await self.__maBoi.Cleanup()
 
 	def ShouldReloadConfiguration(self, message):
-		return self.ShouldDispatchMessage(message) and self.__sanitizer.SanitizeContent(message.content) == "reload"
+		return self.ShouldDispatchMessage(message) and self.__sanitizer.RemoveBotMentionFromStart(message.content) == "reload" and str(message.author.id) == theMaster
 
-	def ShouldExit(self, message):
-		return self.ShouldDispatchMessage(message) and self.__sanitizer.SanitizeContent(message.content) == "exit"
+	def ShouldDispatchMessage(self, message):
+		if self.__maBoi is None:
+			return self.__sanitizer.StartsWithBotMention(message.content)
+		return self.__sanitizer.StartsWithBotMention(message.content) or self.__maBoi.IsThisMessageSpecial(message)
 
-	def Dispatch(self, message):
+	async def Dispatch(self, message):
 		content = self.__sanitizer.SanitizeContent(message.content)
-		self.__maBoi.DealWithIt(content, message)
+		try:
+			await self.__maBoi.DealWithIt(content, message)
+		except Exception as e:
+			await Screamer.Scream(message.channel, "Uh oh! An exception occurred during that one. Here's the output:\n    `{}`".format(str(e)))
+			await Screamer.Scream(message.channel, "```" + traceback.format_exc() + "```")
