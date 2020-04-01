@@ -23,6 +23,11 @@ class CommandStructure:
 		"reply": [ ]
 	}
 
+	## These names would cause collisions
+	DisallowedTypes = [
+		"special"
+	]
+
 def ValidateDocReplyCmd(cmdDef):
 	fileFormat = "docreply/{}.txt"
 	command = cmdDef["cmd"]
@@ -74,6 +79,10 @@ class CommandMapValidator:
 				raise AttributeError("Command type '{}' has redundant required parameters".format(cmdType))
 			if set(CommandStructure.OptionalForAll) - set(CommandStructure.OptionalFor[cmdType]) != set(CommandStructure.OptionalForAll):
 				raise AttributeError("Command type '{}' has redundant optional parameters".format(cmdType))
+		
+		for disallowed in CommandStructure.DisallowedTypes:
+			if disallowed in CommandStructure.RecognizedTypes:
+				raise AttributeError("Cannot have command type '{}'; it would cause a name collision".format(disallowed))
 		
 		self.__Log("ValidateSelf succeeded")
 

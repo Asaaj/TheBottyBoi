@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import asyncio, discord, json, re, time, youtube_dl
+import asyncio, datetime, discord, json, os, random, re, time, youtube_dl
 
 import Screamer
 ReloadableImports = [ Screamer ]
@@ -18,11 +18,8 @@ ytdl_format_options = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'auto',
-    'source_address': '0.0.0.0', # bind to ipv4 since ipv6 addresses cause issues sometimes,
-	'retries': 'infinite'
+    'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
-
-ytdl_before_options = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
 
 ffmpeg_options = {
     'options': '-vn'
@@ -31,39 +28,48 @@ ffmpeg_options = {
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
 class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
-        super().__init__(source, volume)
+	def __init__(self, source, *, data, volume=0.2):
+		super().__init__(source, volume)
 
-        self.data = data
+		self.data = data
 
-        self.title = data.get('title')
-        self.url = data.get('url')
+		self.title = data.get('title')
+		self.url = data.get('url')
 
-    @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False):
-        loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
+	@classmethod
+	async def from_url(cls, url, *, loop=None, stream=False):
+		loop = loop or asyncio.get_event_loop()
+		data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
 
-        if 'entries' in data:
-            # take first item from a playlist
-            data = data['entries'][0]
+		if 'entries' in data:
+			# take first item from a playlist
+			data = data['entries'][0]
 
-        filename = data['url'] if stream else ytdl.prepare_filename(data)
-        return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
+		filename = data['url'] if stream else ytdl.prepare_filename(data)
+		print("AUDIO: Playing from file '{}'".format(filename))
+		return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 class CmdFuncs:
 	def __init__(self):
 		self.__shouldStop = False
 		self.__voiceClient = None
 
-	async def Cleanup(self):
+	def __CleanYoutubeFiles(self):
+		files = os.listdir("./")
+		for f in files:
+			if f.startswith("youtube"):
+				os.remove(f)
+
+	async def Cleanup(self, client):
 		if self.__voiceClient is not None:
+			await client.change_presence(activity=None)
 			await self.__voiceClient.disconnect()
 			self.__voiceClient = None
+		self.__CleanYoutubeFiles()
 
-	async def stfu(self, fullMessage):
+	async def stfu(self, client, fullMessage):
 		self.__shouldStop = True
-		await self.Cleanup()
+		await self.Cleanup(client)
 
 	async def help(self, fullMessage, command=None):
 		with open("command_map.json") as f:
@@ -126,7 +132,21 @@ class CmdFuncs:
 		else:
 			return sender.voice.channel
 
+	def __GetStreamFinished(self, client):
+		def __StreamFinished(self, e=None):
+			if e:
+				print('Player error: %s' % e)
+			else:
+				try:
+					asyncio.ensure_future(self.Cleanup(client))
+				except:
+					pass
+		return __StreamFinished
+
 	async def stream(self, client, fullMessage, url):
+		await Screamer.Scream(fullMessage.channel, "This service is temporarily unavailable because Jacob hasn't had time to debug. <3")
+
+		'''
 		if self.__voiceClient is not None and self.__voiceClient.is_playing():
 			self.__voiceClient.stop()
 		if self.__voiceClient is None:
@@ -135,13 +155,16 @@ class CmdFuncs:
 
 		async with fullMessage.channel.typing():
 			try:
-				player = await YTDLSource.from_url(url, loop=client.loop, stream=True)
-				self.__voiceClient.play(player, after=lambda e: print('Player error: %s' % e) if e else None)
+				player = await YTDLSource.from_url(url, loop=client.loop, stream=False)
+				stream = discord.Game(player.title)
+				await client.change_presence(activity=stream)
+				self.__voiceClient.play(player, after=self.__GetStreamFinished(client))
 				await Screamer.Scream(fullMessage.channel, "Now playing: **{}**".format(player.title))
 
 			except Exception:
 				await Screamer.Scream(fullMessage.channel, "I don't think that URL is supported. Try one for a Youtube video.")
-				await self.Cleanup()
+				await self.Cleanup(client)
+		'''
 
 	async def volume(self, client, fullMessage, percent):
 		if self.__voiceClient is None:
@@ -152,6 +175,99 @@ class CmdFuncs:
 			return 
 		self.__voiceClient.source.volume = int(percent) / 100
 
-	async def update(self, bot, fullMessage):
-		await bot.UpdateAvatar()
-		await Screamer.Scream(fullMessage.channel, "I have updated my avatar.")
+
+	__earliestVote = datetime.datetime(2020, 1, 30)
+	__userPoints = {}
+	__userSelfPoints = {}
+	__lastUtcSyncTime = {}
+
+	async def __GetMessagePointTotal(self, message):
+		upvoteEmoji = "upnion"
+		downvoteEmoji = "downion"
+		randomEmoji = "prego"
+		
+		points = 0
+		selfPoints = 0
+
+		authorId = message.author.id
+
+		for onion in [r for r in message.reactions if hasattr(r.emoji, "name") and r.emoji.name == upvoteEmoji]:
+			points += onion.count
+			if authorId in [u.id for u in await onion.users().flatten()]:
+				selfPoints -= 1
+				points -= 2     ## Since we added a point from ourself above, remove it and one more here. Shame on us.
+				print("SELF VOTE -- <{0.author}>: {0.content}".format(message))
+
+		for onion in [r for r in message.reactions if hasattr(r.emoji, "name") and r.emoji.name == downvoteEmoji]:
+			points -= onion.count
+			if authorId in [u.id for u in await onion.users().flatten()]:
+				selfPoints -= 1
+
+		for prego in [r for r in message.reactions if hasattr(r.emoji, "name") and r.emoji.name == randomEmoji]:
+			if authorId in [u.id for u in await prego.users().flatten()]:
+				amount = random.randint(-5, 5)
+				points += amount
+				selfPoints += amount
+
+		return points, selfPoints
+
+	async def __UpdatePointsFrom(self, message):
+		author = message.author.name
+
+		if author not in self.__userPoints:
+			self.__userPoints[author] = 0
+			self.__userSelfPoints[author] = 0
+
+		newPoints, newSelfPoints = await self.__GetMessagePointTotal(message)
+		self.__userPoints[author] += newPoints
+		self.__userSelfPoints[author] += newSelfPoints
+
+	async def __RefreshLeaderboard(self, fullMessage):
+		await Screamer.Scream(fullMessage.channel, "One second, this might take a while...")
+
+		self.__userPoints = {}
+		self.__userSelfPoints = {}
+		self.__lastUtcSyncTime = datetime.datetime.utcnow()
+
+		numMessages = 0
+		async with fullMessage.channel.typing():
+			async for message in fullMessage.channel.history(limit=100000, after=self.__earliestVote):
+				numMessages += 1
+				await self.__UpdatePointsFrom(message)
+
+		await Screamer.Scream(fullMessage.channel, "Updated point totals of {} messages".format(numMessages))
+
+	async def __UpdateLeaderboard(self, fullMessage):
+		lastSyncTime = self.__lastUtcSyncTime
+		self.__lastUtcSyncTime = datetime.datetime.utcnow()
+
+		print("Updating leaderboard: {} -> {}".format(lastSyncTime.isoformat(timespec="seconds"), self.__lastUtcSyncTime.isoformat(timespec="seconds")))
+
+		numMessages = 0
+		async with fullMessage.channel.typing():
+			async for message in fullMessage.channel.history(after=lastSyncTime):
+				if message.created_at > lastSyncTime:
+					numMessages += 1
+					await self.__UpdatePointsFrom(message)
+
+		await Screamer.Scream(fullMessage.channel, "Updated point totals of {} messages".format(numMessages))
+
+	async def leaderboard(self, fullMessage):
+		if len(self.__userPoints) == 0:
+			await self.__RefreshLeaderboard(fullMessage)
+		else:
+			await self.__UpdateLeaderboard(fullMessage)
+
+		userPoints = [(user, points) for user, points in sorted(self.__userPoints.items(), key=lambda item: -item[1])]
+		longestName = max([len(user) for user, _ in userPoints])
+		output = "Here you go:\n```"
+		for user, points in userPoints:
+			selfPointsString = ""
+			if self.__userSelfPoints[user] != 0:
+				selfPointsString = "({} self votes)".format(self.__userSelfPoints[user])
+
+			additionalSpaces = " " * (longestName - len(user) + 1)
+			output += f"    {user}{additionalSpaces}: {points} points {selfPointsString}\n"
+		output += "```"
+
+		await Screamer.Scream(fullMessage.channel, output)

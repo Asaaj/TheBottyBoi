@@ -9,13 +9,15 @@
 		{
 			"cmd": "stfu",
 			"type": "function",
-			"help": "Stops spam and noise functions."
+			"help": "Stops spam and noise functions.",
+			"requires_client": true
 		},
 		{
 			"cmd": "stop",
 			"type": "function",
 			"func": "stfu",
-			"help": "Alias for `stfu`."
+			"help": "Alias for `stfu`.",
+			"requires_client": true
 		},
 		{
 			"cmd": "compliment",
@@ -51,8 +53,20 @@
 			"requires_client": true,
 			"help": "Sets the volume of currently-streaming video, if there is one."
 		},
+		{
+			"cmd": "leaderboard",
+			"type": "function",
+			"help": "Show the points of everyone in the channel."
+		},
+		{
+			"cmd": "futurama",
+			"type": "docreply",
+			"format": "> {value}",
+			"args": [],
+			"help": "Quotes a random opening-title caption from Futurama."
+		},
 
-
+		
 		{
 			"cmd": "update",
 			"type": "function",

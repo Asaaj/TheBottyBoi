@@ -1,7 +1,9 @@
 import asyncio, sys, unittest
 from io import StringIO
 
-# import Broadcaster, TestStructures
+import Screamer, TestStructures
+
+## I'm not sure how to run async functions from a synchronous method in an asynchronous context
 
 # class TestTestClasses(unittest.TestCase):
 # 	def setUp(self):
@@ -25,7 +27,7 @@ from io import StringIO
 
 # 		asyncio.run(test())
 
-# class TestBroadcaster(unittest.TestCase):
+# class TestScreamer(unittest.TestCase):
 # 	def setUp(self):
 # 		self.__old_stdout = sys.stdout
 # 		sys.stdout = self.__stdout = StringIO()
@@ -39,7 +41,7 @@ from io import StringIO
 # 			channelName = "CHANNEL"
 # 			channel = TestStructures.TestChannel(channelName)
 
-# 			await Broadcaster.Broadcast(channel, message, printToConsole=False)
+# 			await Screamer.Scream(channel, message, printToConsole=False)
 
 # 			expected = channel.FormatMessage(channelName, message).strip()
 # 			actual = self.__stdout.getvalue().strip()

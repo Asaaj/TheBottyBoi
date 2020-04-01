@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import discord, os
+import asyncio, discord, os
 from types import ModuleType
 
 try:
@@ -70,6 +70,9 @@ class Chauffeur(discord.Client):
 		try:
 			if self.__dispatcher.ShouldReloadConfiguration(message):
 				await self.__HandleReload(message.channel)
+			elif self.__dispatcher.ShouldExit(message):
+				await Screamer.Scream(message.channel, "Goodbye! <3")
+				await self.close()
 			elif self.__dispatcher.ShouldDispatchMessage(message):
 				if self.__lastReloadSuccessful:
 					await self.__dispatcher.Dispatch(message)

@@ -5,7 +5,7 @@ import importlib, traceback
 import MessageSanitizer, Screamer, TheBottyBoi
 ReloadableImports = [ MessageSanitizer, Screamer, TheBottyBoi ]
 
-## The only one who can send "reload" commands
+## The only one who can send "reload" and "exit" commands
 theMaster = "184456961255800832"
 
 class MaybeDidntLoad:
@@ -28,6 +28,9 @@ class CommandDispatcher(MaybeDidntLoad):
 
 	def ShouldReloadConfiguration(self, message):
 		return self.ShouldDispatchMessage(message) and self.__sanitizer.RemoveBotMentionFromStart(message.content) == "reload" and str(message.author.id) == theMaster
+
+	def ShouldExit(self, message):
+		return self.ShouldDispatchMessage(message) and self.__sanitizer.RemoveBotMentionFromStart(message.content) == "exit" and str(message.author.id) == theMaster
 
 	def ShouldDispatchMessage(self, message):
 		if self.__maBoi is None:
