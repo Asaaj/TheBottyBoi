@@ -143,10 +143,9 @@ class CmdFuncs:
 					pass
 		return __StreamFinished
 
-	async def stream(self, client, fullMessage, url):
-		await Screamer.Scream(fullMessage.channel, "This service is temporarily unavailable because Jacob hasn't had time to debug. <3")
+	async def play(self, client, fullMessage, url):
+		# await Screamer.Scream(fullMessage.channel, "This service is temporarily unavailable because Jacob hasn't had time to debug. <3")
 
-		'''
 		if self.__voiceClient is not None and self.__voiceClient.is_playing():
 			self.__voiceClient.stop()
 		if self.__voiceClient is None:
@@ -164,7 +163,6 @@ class CmdFuncs:
 			except Exception:
 				await Screamer.Scream(fullMessage.channel, "I don't think that URL is supported. Try one for a Youtube video.")
 				await self.Cleanup(client)
-		'''
 
 	async def volume(self, client, fullMessage, percent):
 		if self.__voiceClient is None:
@@ -177,8 +175,8 @@ class CmdFuncs:
 
 
 	__earliestVote = datetime.datetime(2020, 1, 30)
-	__userPoints = {}
-	__userSelfPoints = {}
+	__channelToLeaderboard = {}
+	__channelToUserSelfPoints = {}
 	__lastUtcSyncTime = {}
 
 	async def __GetMessagePointTotal(self, message):
@@ -196,7 +194,7 @@ class CmdFuncs:
 			if authorId in [u.id for u in await onion.users().flatten()]:
 				selfPoints -= 1
 				points -= 2     ## Since we added a point from ourself above, remove it and one more here. Shame on us.
-				print("SELF VOTE -- <{0.author}>: {0.content}".format(message))
+				print("SELF VOTE\n    {0.author} <{0.created_at}>: {0.content}".format(message))
 
 		for onion in [r for r in message.reactions if hasattr(r.emoji, "name") and r.emoji.name == downvoteEmoji]:
 			points -= onion.count
@@ -208,32 +206,34 @@ class CmdFuncs:
 				amount = random.randint(-5, 5)
 				points += amount
 				selfPoints += amount
+				print("PREGO ({1})\n    {0.author} <{0.created_at}>: {0.content}".format(message, amount))
 
 		return points, selfPoints
 
-	async def __UpdatePointsFrom(self, message):
+	async def __UpdatePointsFrom(self, channelId, message):
 		author = message.author.name
 
-		if author not in self.__userPoints:
-			self.__userPoints[author] = 0
-			self.__userSelfPoints[author] = 0
+		if author not in self.__channelToLeaderboard[channelId]:
+			self.__channelToLeaderboard[channelId][author] = 0
+			self.__channelToUserSelfPoints[channelId][author] = 0
 
 		newPoints, newSelfPoints = await self.__GetMessagePointTotal(message)
-		self.__userPoints[author] += newPoints
-		self.__userSelfPoints[author] += newSelfPoints
+		self.__channelToLeaderboard[channelId][author] += newPoints
+		self.__channelToUserSelfPoints[channelId][author] += newSelfPoints
 
 	async def __RefreshLeaderboard(self, fullMessage):
 		await Screamer.Scream(fullMessage.channel, "One second, this might take a while...")
 
-		self.__userPoints = {}
-		self.__userSelfPoints = {}
+		channelId = fullMessage.channel.id
+		self.__channelToLeaderboard[channelId] = {}
+		self.__channelToUserSelfPoints[channelId] = {}
 		self.__lastUtcSyncTime = datetime.datetime.utcnow()
 
 		numMessages = 0
 		async with fullMessage.channel.typing():
 			async for message in fullMessage.channel.history(limit=100000, after=self.__earliestVote):
 				numMessages += 1
-				await self.__UpdatePointsFrom(message)
+				await self.__UpdatePointsFrom(channelId, message)
 
 		await Screamer.Scream(fullMessage.channel, "Updated point totals of {} messages".format(numMessages))
 
@@ -243,31 +243,39 @@ class CmdFuncs:
 
 		print("Updating leaderboard: {} -> {}".format(lastSyncTime.isoformat(timespec="seconds"), self.__lastUtcSyncTime.isoformat(timespec="seconds")))
 
+		channelId = fullMessage.channel.id
 		numMessages = 0
 		async with fullMessage.channel.typing():
 			async for message in fullMessage.channel.history(after=lastSyncTime):
 				if message.created_at > lastSyncTime:
 					numMessages += 1
-					await self.__UpdatePointsFrom(message)
+					await self.__UpdatePointsFrom(channelId, message)
 
 		await Screamer.Scream(fullMessage.channel, "Updated point totals of {} messages".format(numMessages))
 
-	async def leaderboard(self, fullMessage):
-		if len(self.__userPoints) == 0:
+	async def leaderboard(self, bot, fullMessage):
+		channelId = fullMessage.channel.id
+		if channelId not in self.__channelToLeaderboard:
+			self.__channelToLeaderboard[channelId] = {}
+			self.__channelToUserSelfPoints[channelId] = {}
+		if len(self.__channelToLeaderboard[channelId]) == 0:
 			await self.__RefreshLeaderboard(fullMessage)
 		else:
 			await self.__UpdateLeaderboard(fullMessage)
 
-		userPoints = [(user, points) for user, points in sorted(self.__userPoints.items(), key=lambda item: -item[1])]
+		botName = bot.GetRawClient().user.name
+		userNum = 1
+		userPoints = [(user, points) for user, points in sorted(self.__channelToLeaderboard[channelId].items(), key=lambda item: -item[1]) if user != botName]
 		longestName = max([len(user) for user, _ in userPoints])
 		output = "Here you go:\n```"
 		for user, points in userPoints:
 			selfPointsString = ""
-			if self.__userSelfPoints[user] != 0:
-				selfPointsString = "({} self votes)".format(self.__userSelfPoints[user])
+			if self.__channelToUserSelfPoints[channelId][user] != 0:
+				selfPointsString = "({} self votes)".format(self.__channelToUserSelfPoints[channelId][user])
 
 			additionalSpaces = " " * (longestName - len(user) + 1)
-			output += f"    {user}{additionalSpaces}: {points} points {selfPointsString}\n"
+			output += f"{userNum}    {user}{additionalSpaces}: {points} points {selfPointsString}\n"
+			userNum += 1
 		output += "```"
 
 		await Screamer.Scream(fullMessage.channel, output)

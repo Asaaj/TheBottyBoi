@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import asyncio, discord, os
+import asyncio, datetime, discord, os
 from types import ModuleType
 
 try:
@@ -61,10 +61,26 @@ class Chauffeur(discord.Client):
 	def __GetHandlerLoadIssues(self):
 		return [self.__dispatcher.GetLoadIssue()]
 
+	async def __SendDm(self, userId, message):
+		userObject = self.get_user(int(userId))
+		if userObject is None:
+			print(f"!! Failed to send DM to <@{userId}>")
+			return
+		dmChannel = await userObject.create_dm()
+		print(f"DM <@{userId}> <{datetime.datetime.now()}>: {message}")
+		await dmChannel.send(message)
+
+	## The only one who can send "reload" and "exit" commands
+	def GetMasterId(self):
+		return "184456961255800832"
+
 	async def on_ready(self):
 		print("Successfully logged in as '{}'".format(self.user))
+		print("Time: " + str(datetime.datetime.now()))
 		print("Channels: ", [c.name for c in list(self.get_all_channels())])
 		self.__LoadHandlers()
+
+		await self.__SendDm(self.GetMasterId(), f"Logged in at {datetime.datetime.now()}")
 
 	async def on_message(self, message):
 		try:
@@ -83,7 +99,7 @@ class Chauffeur(discord.Client):
 			await Screamer.Scream(message.channel, "Whoops, I hit some unforeseen exception. Check the output for more information.")
 		
 if __name__ == '__main__':
-	print("Using discordpy version " + discord.__version__)
+	print(f"\n\n\n<{datetime.datetime.now()}> Using discordpy version {discord.__version__}")
 	if all([API.ClientId, API.BotToken]):
 		chauffeur = Chauffeur()
 		chauffeur.run(API.BotToken)

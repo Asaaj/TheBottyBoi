@@ -5,9 +5,6 @@ import importlib, traceback
 import MessageSanitizer, Screamer, TheBottyBoi
 ReloadableImports = [ MessageSanitizer, Screamer, TheBottyBoi ]
 
-## The only one who can send "reload" and "exit" commands
-theMaster = "184456961255800832"
-
 class MaybeDidntLoad:
 	LoadIssue = None
 	def GetLoadIssue(self):
@@ -16,6 +13,7 @@ class MaybeDidntLoad:
 class CommandDispatcher(MaybeDidntLoad):
 	def __init__(self, botId, clientConnection):
 		self.__sanitizer = MessageSanitizer.MessageSanitizer(botId)
+		self.__theMaster = clientConnection.GetMasterId()
 		try:
 			self.__maBoi = TheBottyBoi.TheBottyBoi(botId, clientConnection)
 		except Exception as e:
@@ -27,10 +25,10 @@ class CommandDispatcher(MaybeDidntLoad):
 			await self.__maBoi.Cleanup()
 
 	def ShouldReloadConfiguration(self, message):
-		return self.ShouldDispatchMessage(message) and self.__sanitizer.RemoveBotMentionFromStart(message.content) == "reload" and str(message.author.id) == theMaster
+		return self.ShouldDispatchMessage(message) and self.__sanitizer.RemoveBotMentionFromStart(message.content) == "reload" and str(message.author.id) == self.__theMaster
 
 	def ShouldExit(self, message):
-		return self.ShouldDispatchMessage(message) and self.__sanitizer.RemoveBotMentionFromStart(message.content) == "exit" and str(message.author.id) == theMaster
+		return self.ShouldDispatchMessage(message) and self.__sanitizer.RemoveBotMentionFromStart(message.content) == "exit" and str(message.author.id) == self.__theMaster
 
 	def ShouldDispatchMessage(self, message):
 		if self.__maBoi is None:

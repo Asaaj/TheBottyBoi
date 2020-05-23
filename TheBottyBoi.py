@@ -33,6 +33,9 @@ class TheBottyBoi:
 			"special": CommandHandlers.SpecialHandler()
 		}
 
+	def GetRawClient(self):
+		return self.__client
+
 	async def UpdateAvatar(self):
 		with open(botAvatarPath, "rb") as f:
 			await self.__client.user.edit(avatar=f.read())

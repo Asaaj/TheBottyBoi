@@ -1,4 +1,5 @@
+import datetime
 async def Scream(channel, message, printToConsole=True):
 	if printToConsole:
-		print("Screamer: ", message)
+		print(f"Screamer <{datetime.datetime.now()}>:  {message}")
 	await channel.send(message, tts=False)

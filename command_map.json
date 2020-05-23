@@ -40,11 +40,18 @@
 			"help": "Reminds [user] to join voice chat. Can provide the number of times to prod, and the time between the messages in seconds."
 		},
 		{
-			"cmd": "stream",
+			"cmd": "play",
 			"type": "function",
 			"args": [ "url" ],
 			"requires_client": true,
-			"help": "Streams [url] from Youtube in your voice chat. If you're not in chat, I default to the chat with the most people."
+			"help": "Streams [url] from Youtube in your voice chat. If provided something other than a URL, I search Youtube for the argument and plays the first thing it finds. If you're not in chat, I default to the chat with the most people."
+		},
+		{
+			"cmd": "stream",
+			"type": "function",
+			"func": "play",
+			"args": [ "url" ],
+			"help": "Alias for `play`."
 		},
 		{
 			"cmd": "volume",
@@ -56,7 +63,8 @@
 		{
 			"cmd": "leaderboard",
 			"type": "function",
-			"help": "Show the points of everyone in the channel."
+			"requires_bot": true,
+			"help": "Shows the points of everyone in the channel."
 		},
 		{
 			"cmd": "futurama",
