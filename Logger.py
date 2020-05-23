@@ -78,6 +78,7 @@ def Log(message, colors=''):
 
 	timestampText = "[" + GetFormattedTime() + "] "
 
+	## Pad the additional lines of a multi-line message, since they don't get timestamps
 	optionalPadding = " " * (len(timestampText) + 2)
 	output = output.replace("\n", "\n" + optionalPadding)
 	output = timestampColor + timestampText + END + output

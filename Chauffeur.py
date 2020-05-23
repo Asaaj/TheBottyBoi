@@ -28,6 +28,7 @@ class Chauffeur(discord.Client):
 	__lastReloadSuccessful = True
 
 	async def __HandleReload(self, channel):
+		failedThisTime = False
 		try:
 			await self.__dispatcher.Cleanup()
 			reloaded = self.__ReloadModules()
@@ -39,14 +40,22 @@ class Chauffeur(discord.Client):
 				for problem in [p for p in handlerLoadIssues if p]:
 					Logger.Log(str(problem), Logger.WARNING)
 				self.__lastReloadSuccessful = False
-				return
+				failedThisTime = True
+
 		except Exception as e:
 			await Screamer.Scream(channel, "An exception was thrown while reloading. I will only respond to to the 'reload' command until the errors are resolved. See the log for more details.")
 			Logger.Log("EXCEPTION: " + str(e), Logger.FAIL)
 			self.__lastReloadSuccessful = False
+			failedThisTime = True
+
+		if failedThisTime:
+			Logger.Log("Setting status to 'busy'", Logger.WARNING)
+			activity = discord.CustomActivity("Problems reloading")
+			await self.change_presence(status=discord.Status.do_not_disturb, activity=activity)
 			return
 
 		self.__lastReloadSuccessful = True
+		await self.change_presence(status=discord.Status.online)
 		await Screamer.Scream(channel, "Successfully reloaded ({} unique modules reloaded)".format(len(reloaded)))
 
 	def __ReloadModules(self):

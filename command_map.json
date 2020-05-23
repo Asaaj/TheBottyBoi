@@ -44,7 +44,7 @@
 			"type": "function",
 			"args": [ "url" ],
 			"requires_client": true,
-			"help": "Streams [url] from Youtube in your voice chat. If provided something other than a URL, I search Youtube for the argument and plays the first thing it finds. If you're not in chat, I default to the chat with the most people."
+			"help": "Streams [url] from Youtube in your voice chat. If provided something other than a URL, I search Youtube for the argument and play the first thing it finds. If you're not in chat, I default to the chat with the most people."
 		},
 		{
 			"cmd": "stream",
