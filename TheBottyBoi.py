@@ -2,8 +2,8 @@
 
 import json, unittest, urllib
 
-import CommandHandlers, CommandValidation, Screamer, UnitTests
-ReloadableImports = [ CommandHandlers, CommandValidation, Screamer, UnitTests ]
+import CommandHandlers, CommandValidation, Logger, Screamer, UnitTests
+ReloadableImports = [ CommandHandlers, CommandValidation, Logger, Screamer, UnitTests ]
 
 botAvatarPath = "blotty.png"
 
@@ -14,10 +14,13 @@ class TheBottyBoi:
 	__client = None
 
 	def __Log(self, message):
-		print("TheBottyBoi: " + message)
+		Logger.Log(Logger.AsHeader("TheBottyBoi") + ": " + message)
 
 	def __LogMessage(self, message):
-		print("{0.guild}\n    {0.author} <{0.created_at}>: {0.content}".format(message))
+		guildPrefix = ""
+		if message.guild is not None:
+			guildPrefix = Logger.AsHeader(f"{message.guild}") + ": "
+		Logger.Log(guildPrefix + Logger.GetFormattedMessage(message))
 
 	def __init__(self, botId, clientConnection):
 		self.__botId = botId

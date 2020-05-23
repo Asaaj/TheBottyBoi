@@ -8,11 +8,11 @@ try:
 except ImportError:
     from imp import reload
 
-import MessageHandling, Screamer
-ReloadableImports = [ MessageHandling, Screamer ]
+import Logger, MessageHandling, Screamer
+ReloadableImports = [ Logger, MessageHandling, Screamer ]
 
 def ReloadReloadableModule(module, alreadyReloaded):
-	print("Reloading {}".format(module.__name__))
+	Logger.Log("Reloading {}".format(module.__name__), Logger.HEADER)
 	reload(module)
 	alreadyReloaded.add(module)
 	if not hasattr(module, "ReloadableImports"):
@@ -35,14 +35,14 @@ class Chauffeur(discord.Client):
 			handlerLoadIssues = self.__GetHandlerLoadIssues()
 			if any(handlerLoadIssues):
 				await Screamer.Scream(channel, "There was a problem loading the message handlers. I will only respond to the 'reload' command until the errors are resolved. See the log for more details.")
-				print("ERROR: Problems with reload!")
+				Logger.Log("Problems with reload!", Logger.FAIL)
 				for problem in [p for p in handlerLoadIssues if p]:
-					print(str(problem))
+					Logger.Log(str(problem), Logger.WARNING)
 				self.__lastReloadSuccessful = False
 				return
 		except Exception as e:
 			await Screamer.Scream(channel, "An exception was thrown while reloading. I will only respond to to the 'reload' command until the errors are resolved. See the log for more details.")
-			print("EXCEPTION: " + str(e))
+			Logger.Log("EXCEPTION: " + str(e), Logger.FAIL)
 			self.__lastReloadSuccessful = False
 			return
 
@@ -64,10 +64,10 @@ class Chauffeur(discord.Client):
 	async def __SendDm(self, userId, message):
 		userObject = self.get_user(int(userId))
 		if userObject is None:
-			print(f"!! Failed to send DM to <@{userId}>")
+			Logger.Log(f"Failed to send DM to <@{userId}>", Logger.FAIL)
 			return
 		dmChannel = await userObject.create_dm()
-		print(f"DM <@{userId}> <{datetime.datetime.now()}>: {message}")
+		Logger.Log(f"DM <@{userId}> <{datetime.datetime.now()}>: {message}")
 		await dmChannel.send(message)
 
 	## The only one who can send "reload" and "exit" commands
@@ -75,9 +75,9 @@ class Chauffeur(discord.Client):
 		return "184456961255800832"
 
 	async def on_ready(self):
-		print("Successfully logged in as '{}'".format(self.user))
-		print("Time: " + str(datetime.datetime.now()))
-		print("Channels: ", [c.name for c in list(self.get_all_channels())])
+		Logger.Log("Successfully logged in as '{}'".format(self.user), Logger.SUCCESS)
+		Logger.Log("Time: " + str(datetime.datetime.now()))
+		Logger.Log("Channels: " + str([c.name for c in list(self.get_all_channels())]))
 		self.__LoadHandlers()
 
 		await self.__SendDm(self.GetMasterId(), f"Logged in at {datetime.datetime.now()}")
@@ -95,11 +95,12 @@ class Chauffeur(discord.Client):
 				else:
 					await Screamer.Scream(message.channel, "Sorry, I can't handle commands until you correct the last reload errors.")
 		except Exception as e:
-			print("EXCEPTION: " + str(e))
+			Logger.Log("EXCEPTION: " + str(e), Logger.FAIL)
 			await Screamer.Scream(message.channel, "Whoops, I hit some unforeseen exception. Check the output for more information.")
 		
 if __name__ == '__main__':
-	print(f"\n\n\n<{datetime.datetime.now()}> Using discordpy version {discord.__version__}")
+	print("\n\n")
+	Logger.Log(f"Using discordpy version {discord.__version__}", Logger.HEADER)
 	if all([API.ClientId, API.BotToken]):
 		chauffeur = Chauffeur()
 		chauffeur.run(API.BotToken)

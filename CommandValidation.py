@@ -2,6 +2,9 @@
 
 import os, re
 
+import Logger
+ReloadableImports = [ Logger ]
+
 class CommandStructure:
 	RecognizedTypes = [ 
 		"docreply",
@@ -47,8 +50,8 @@ class CommandMapValidator:
 		"reply": ValidateReplyCmd
 	}
 
-	def __Log(self, msg):
-		print("CommandMapValidator: " + msg)
+	def __FormatLog(self, message):
+		return Logger.AsHeader("CommandMapValidator") + ": " + message
 
 	def __init__(self, cmdMap):
 		self.__cmdMap = cmdMap
@@ -62,9 +65,9 @@ class CommandMapValidator:
 			for cmdDef in self.__cmdMap:
 				self.__ValidateCmd(cmdDef)
 		except Exception as e:
-			self.__Log("Command map validation failed")
+			Logger.Log(self.__FormatLog("Command map validation failed"), Logger.FAIL)
 			raise e
-		self.__Log("Command map validation successful")
+		Logger.Log(self.__FormatLog("Command map validation successful"), Logger.SUCCESS)
 
 	def __ValidateSelf(self):
 		for cmdType in set(list(CommandStructure.RequiredFor.keys()) + list(CommandStructure.OptionalFor.keys())):
@@ -84,7 +87,7 @@ class CommandMapValidator:
 			if disallowed in CommandStructure.RecognizedTypes:
 				raise AttributeError("Cannot have command type '{}'; it would cause a name collision".format(disallowed))
 		
-		self.__Log("ValidateSelf succeeded")
+		Logger.Log(self.__FormatLog("ValidateSelf succeeded"), Logger.SUCCESS)
 
 	def __ValidateCmd(self, cmdDef):
 		self.__ValidateRequired(cmdDef)

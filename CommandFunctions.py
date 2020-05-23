@@ -2,8 +2,8 @@
 
 import asyncio, datetime, discord, json, os, random, re, time, youtube_dl
 
-import Screamer
-ReloadableImports = [ Screamer ]
+import Logger, Screamer
+ReloadableImports = [ Logger, Screamer ]
 
 youtube_dl.utils.bug_reports_message = lambda: ''
 
@@ -46,7 +46,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
 			data = data['entries'][0]
 
 		filename = data['url'] if stream else ytdl.prepare_filename(data)
-		print("AUDIO: Playing from file '{}'".format(filename))
+		Logger.Log("AUDIO: Playing from file '{}'".format(filename), Logger.OKBLUE)
 		return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 class CmdFuncs:
@@ -135,7 +135,7 @@ class CmdFuncs:
 	def __GetStreamFinished(self, client):
 		def __StreamFinished(self, e=None):
 			if e:
-				print('Player error: %s' % e)
+				Logger.Log('Player error: %s' % e, Logger.FAIL)
 			else:
 				try:
 					asyncio.ensure_future(self.Cleanup(client))
@@ -194,7 +194,7 @@ class CmdFuncs:
 			if authorId in [u.id for u in await onion.users().flatten()]:
 				selfPoints -= 1
 				points -= 2     ## Since we added a point from ourself above, remove it and one more here. Shame on us.
-				print("SELF VOTE\n    {0.author} <{0.created_at}>: {0.content}".format(message))
+				Logger.Log("Self vote: " + Logger.GetFormattedMessage(message), Logger.WARNING)
 
 		for onion in [r for r in message.reactions if hasattr(r.emoji, "name") and r.emoji.name == downvoteEmoji]:
 			points -= onion.count
@@ -206,7 +206,7 @@ class CmdFuncs:
 				amount = random.randint(-5, 5)
 				points += amount
 				selfPoints += amount
-				print("PREGO ({1})\n    {0.author} <{0.created_at}>: {0.content}".format(message, amount))
+				Logger.Log(f"Prego ({amount}): " + Logger.GetFormattedMessage(message), Logger.WARNING)
 
 		return points, selfPoints
 
@@ -235,13 +235,16 @@ class CmdFuncs:
 				numMessages += 1
 				await self.__UpdatePointsFrom(channelId, message)
 
+		Logger.Log("Leaderboard update successful", Logger.SUCCESS)
 		await Screamer.Scream(fullMessage.channel, "Updated point totals of {} messages".format(numMessages))
 
 	async def __UpdateLeaderboard(self, fullMessage):
 		lastSyncTime = self.__lastUtcSyncTime
 		self.__lastUtcSyncTime = datetime.datetime.utcnow()
 
-		print("Updating leaderboard: {} -> {}".format(lastSyncTime.isoformat(timespec="seconds"), self.__lastUtcSyncTime.isoformat(timespec="seconds")))
+		Logger.Log("Updating leaderboard: {} -> {}".format(lastSyncTime.isoformat(timespec="seconds"), 
+		                                                   self.__lastUtcSyncTime.isoformat(timespec="seconds")),
+		           Logger.OKBLUE)
 
 		channelId = fullMessage.channel.id
 		numMessages = 0
