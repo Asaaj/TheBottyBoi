@@ -120,6 +120,10 @@ class CmdFuncs:
 			count += 1
 		self.__shouldStop = False
 
+
+	##############
+	### Stream ###
+	##############
 	def __GetVoiceChannel(self, client, fullMessage):
 		sender = fullMessage.author
 		if not hasattr(sender, "voice"):
@@ -174,6 +178,9 @@ class CmdFuncs:
 		self.__voiceClient.source.volume = int(percent) / 100
 
 
+	###################
+	### Leaderboard ###
+	###################
 	__earliestVote = datetime.datetime(2020, 1, 30)
 	__channelToLeaderboard = {}
 	__channelToUserSelfPoints = {}
@@ -282,3 +289,125 @@ class CmdFuncs:
 		output += "```"
 
 		await Screamer.Scream(fullMessage.channel, output)
+
+
+	######################
+	### Drinking Games ###
+	######################
+	__drinkingGameChannel = "drinking-games"
+	__rulesThatApplyToAll = "all"
+	__categories = {
+	##	"message prefix"  : "printed category output"
+		"everyone drinks" : "Everyone drinks",
+		"you drink"       : "You drink"
+	}
+	__uncategorizedPrefix = "Other"
+
+	async def __GetDrinkingGameChannel(self, fullMessage):
+		guild = fullMessage.guild
+		if guild is None:
+			Logger.Log("Message had no associated guild. Cannot get a drinking game channel", Logger.FAIL)
+			return None
+
+		channels = guild.text_channels
+		channel = next((c for c in channels if c.name == self.__drinkingGameChannel), None)
+		if channel is None:
+			Logger.Log(f"Couldn't find #{self.__drinkingGameChannel}", Logger.FAIL)
+			await Screamer.Scream(fullMessage.channel, f"Sorry, I couldn't find a channel called #{self.__drinkingGameChannel}.")
+		else:
+			Logger.Log(f"Found channel #{channel.name}", Logger.SUCCESS)
+
+		return channel
+
+	async def __GetDrinkingGameMap(self, fullMessage):
+		gameChannel = await self.__GetDrinkingGameChannel(fullMessage)
+		if gameChannel is None:
+			return
+
+		gameToRulesMap = {}
+		# await Screamer.Scream(fullMessage.channel, "Compiling rules...")
+		async with fullMessage.channel.typing():
+			async for message in gameChannel.history():
+				matches = re.search("^@([A-Za-z0-9]*) (.*)", message.content.strip())
+				if matches is None or len(matches.groups()) != 2:
+					continue
+
+				Logger.Log(Logger.AsHeader("Game rule: ") + str(matches.groups()))
+				game = matches.group(1).lower()
+				rules = matches.group(2)  ## Not lower(), keep the capitalization
+				if game not in gameToRulesMap:
+					gameToRulesMap[game] = []
+				gameToRulesMap[game].append(rules)
+
+		if len(gameToRulesMap) == 0:
+			Logger.Log("Drinking game channel had no games!", Logger.WARNING)
+			await Screamer.Scream(fullMessage.channel, f"No games found in #{self.__drinkingGameChannel}")
+
+		return gameToRulesMap
+
+	async def drinkinggames(self, fullMessage):
+		gameToRulesMap = await self.__GetDrinkingGameMap(fullMessage)
+		output = "Here are the games:\n```"
+		longestName = max([len(game) for game in gameToRulesMap])
+		sortedGames = dict(sorted(gameToRulesMap.items()))
+		for game, rules in [(g, r) for g, r in sortedGames.items() if g != self.__rulesThatApplyToAll]:
+			additionalSpaces = " " * (longestName - len(game) + 1)
+			numRules = len(rules)
+			rulesLabel = "rule" if numRules == 1 else "rules"
+			output += f"> {game.title()}{additionalSpaces}({len(rules)} {rulesLabel})\n"
+		output += "```"
+
+		await Screamer.Scream(fullMessage.channel, output)
+
+	def __DivideIntoCategories(self, gamesToShow, gameToRulesMap):
+		categoryToRulesMap = {}
+		onlyGamesToShow = [(g, r) for g, r in gameToRulesMap.items() if g in gamesToShow]
+		for game, rulesForGame in onlyGamesToShow:
+			Logger.Log(f"Game '{game}': {rulesForGame}", Logger.OKBLUE)
+
+			for rule in rulesForGame:
+				foundPrefix = next((prefix for prefix in self.__categories if rule.startswith(prefix)), None)
+				if foundPrefix is None:
+					printablePrefix = self.__uncategorizedPrefix
+				else:
+					printablePrefix = self.__categories[foundPrefix]
+					rule = rule[len(foundPrefix):]  ## Trim since it fits in a category
+
+				if printablePrefix not in categoryToRulesMap:
+					categoryToRulesMap[printablePrefix] = []
+				categoryToRulesMap[printablePrefix].append(rule)
+
+		return categoryToRulesMap
+
+	async def __OutputRulesForOneGame(self, fullMessage, game):
+		gameToRulesMap = await self.__GetDrinkingGameMap(fullMessage)
+		game = game.lower()
+		if game not in gameToRulesMap:
+			await Screamer.Scream(fullMessage.channel, f"Sorry, '{game.title()}' is not a valid game.")
+			await self.drinkinggames(fullMessage)
+			return
+
+		rules = self.__DivideIntoCategories([self.__rulesThatApplyToAll, game], gameToRulesMap)
+
+		output = f"Rules for game '{game.title()}':\n```"
+		for category, rules in rules.items():
+			output += f"{category}:\n"
+			for rule in rules:
+				output += f"  - {rule}\n"
+			output += "\n"
+		
+		output += "```"
+		await Screamer.Scream(fullMessage.channel, output)
+
+	async def rules(self, fullMessage, game=None):
+		if game is not None:
+			await self.__OutputRulesForOneGame(fullMessage, game)
+		else:
+			## TODO: This calls the rebuild twice. It really shouldn't
+			gameToRulesMap = await self.__GetDrinkingGameMap(fullMessage)
+			for singleGame in [g for g in gameToRulesMap if g != self.__rulesThatApplyToAll]:
+				await self.__OutputRulesForOneGame(fullMessage, singleGame)
+
+
+	async def allrules(self, fullMessage):
+		pass

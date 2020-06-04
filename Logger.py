@@ -59,6 +59,7 @@ def GetFormattedMessage(message):
 	return AsHeader(f"{message.author} ") + AsOk(f"<{formattedCreateTime}>") + f": {message.content}"
 
 def Log(message, colors=''):
+	message = str(message)
 	output = colors + message + END
 
 	if all(c not in colors for c in __OverridingColors__):
@@ -72,7 +73,7 @@ def Log(message, colors=''):
 		output = output.replace(END, __OverridingToPlainColor__[firstFound])
 		output = output + END
 
-	timestampColor = GREEN
+	timestampColor = BLUE
 	if FAIL in colors:
 		timestampColor = RED + BOLD
 

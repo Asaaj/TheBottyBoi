@@ -67,6 +67,17 @@
 			"help": "Shows the points of everyone in the channel."
 		},
 		{
+			"cmd": "drinking games",
+			"type": "function",
+			"help": "Lists available drinking games from the channel #drinking-games."
+		},
+		{
+			"cmd": "rules",
+			"type": "function",
+			"args": [ "[game]" ],
+			"help": "Lists the rules for [game] as outlined in the channel #drinking-games. If no argument is provided, I print all game rules."
+		},
+		{
 			"cmd": "futurama",
 			"type": "docreply",
 			"format": "> {value}",
