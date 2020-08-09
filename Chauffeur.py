@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import asyncio, datetime, discord, os
+import asyncio, datetime, discord, os, traceback
 from types import ModuleType
 
 try:
@@ -44,7 +44,9 @@ class Chauffeur(discord.Client):
 
 		except Exception as e:
 			await Screamer.Scream(channel, "An exception was thrown while reloading. I will only respond to to the 'reload' command until the errors are resolved. See the log for more details.")
+			tracebackString = ''.join(traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__))
 			Logger.Log("EXCEPTION: " + str(e), Logger.FAIL)
+			Logger.Log(tracebackString, Logger.FAIL)
 			self.__lastReloadSuccessful = False
 			failedThisTime = True
 

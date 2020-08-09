@@ -2,8 +2,8 @@
 
 import asyncio, datetime, discord, json, os, random, re, time, youtube_dl
 
-import Logger, Screamer
-ReloadableImports = [ Logger, Screamer ]
+import Leaderboard, Logger, Screamer
+ReloadableImports = [ Leaderboard, Logger, Screamer ]
 
 youtube_dl.utils.bug_reports_message = lambda: ''
 
@@ -159,13 +159,14 @@ class CmdFuncs:
 		async with fullMessage.channel.typing():
 			try:
 				player = await YTDLSource.from_url(url, loop=client.loop, stream=False)
-				stream = discord.Game(player.title)
-				await client.change_presence(activity=stream)
 				self.__voiceClient.play(player, after=self.__GetStreamFinished(client))
 				await Screamer.Scream(fullMessage.channel, "Now playing: **{}**".format(player.title))
+				stream = discord.Game(player.title)
+				await client.change_presence(activity=stream)
 
-			except Exception:
-				await Screamer.Scream(fullMessage.channel, "I don't think that URL is supported. Try one for a Youtube video.")
+			except Exception as e:
+				await Screamer.Scream(fullMessage.channel, "Hmm, something went wrong with playback. Invalid search or URL, maybe? Check the output for more information.")
+				Logger.Log("EXCEPTION: " + str(e), Logger.FAIL)
 				await self.Cleanup(client)
 
 	async def volume(self, client, fullMessage, percent):
@@ -181,114 +182,9 @@ class CmdFuncs:
 	###################
 	### Leaderboard ###
 	###################
-	__earliestVote = datetime.datetime(2020, 1, 30)
-	__channelToLeaderboard = {}
-	__channelToUserSelfPoints = {}
-	__lastUtcSyncTime = {}
-
-	async def __GetMessagePointTotal(self, message):
-		upvoteEmoji = "upnion"
-		downvoteEmoji = "downion"
-		randomEmoji = "prego"
-		
-		points = 0
-		selfPoints = 0
-
-		authorId = message.author.id
-
-		for onion in [r for r in message.reactions if hasattr(r.emoji, "name") and r.emoji.name == upvoteEmoji]:
-			points += onion.count
-			if authorId in [u.id for u in await onion.users().flatten()]:
-				selfPoints -= 1
-				points -= 2     ## Since we added a point from ourself above, remove it and one more here. Shame on us.
-				Logger.Log("Self vote: " + Logger.GetFormattedMessage(message), Logger.WARNING)
-
-		for onion in [r for r in message.reactions if hasattr(r.emoji, "name") and r.emoji.name == downvoteEmoji]:
-			points -= onion.count
-			if authorId in [u.id for u in await onion.users().flatten()]:
-				selfPoints -= 1
-
-		for prego in [r for r in message.reactions if hasattr(r.emoji, "name") and r.emoji.name == randomEmoji]:
-			if authorId in [u.id for u in await prego.users().flatten()]:
-				amount = random.randint(-5, 5)
-				points += amount
-				selfPoints += amount
-				Logger.Log(f"Prego ({amount}): " + Logger.GetFormattedMessage(message), Logger.WARNING)
-
-		return points, selfPoints
-
-	async def __UpdatePointsFrom(self, channelId, message):
-		author = message.author.name
-
-		if author not in self.__channelToLeaderboard[channelId]:
-			self.__channelToLeaderboard[channelId][author] = 0
-			self.__channelToUserSelfPoints[channelId][author] = 0
-
-		newPoints, newSelfPoints = await self.__GetMessagePointTotal(message)
-		self.__channelToLeaderboard[channelId][author] += newPoints
-		self.__channelToUserSelfPoints[channelId][author] += newSelfPoints
-
-	async def __RefreshLeaderboard(self, fullMessage):
-		await Screamer.Scream(fullMessage.channel, "One second, this might take a while...")
-
-		channelId = fullMessage.channel.id
-		self.__channelToLeaderboard[channelId] = {}
-		self.__channelToUserSelfPoints[channelId] = {}
-		self.__lastUtcSyncTime = datetime.datetime.utcnow()
-
-		numMessages = 0
-		async with fullMessage.channel.typing():
-			async for message in fullMessage.channel.history(limit=100000, after=self.__earliestVote):
-				numMessages += 1
-				await self.__UpdatePointsFrom(channelId, message)
-
-		Logger.Log("Leaderboard update successful", Logger.SUCCESS)
-		await Screamer.Scream(fullMessage.channel, "Updated point totals of {} messages".format(numMessages))
-
-	async def __UpdateLeaderboard(self, fullMessage):
-		lastSyncTime = self.__lastUtcSyncTime
-		self.__lastUtcSyncTime = datetime.datetime.utcnow()
-
-		Logger.Log("Updating leaderboard: {} -> {}".format(lastSyncTime.isoformat(timespec="seconds"), 
-		                                                   self.__lastUtcSyncTime.isoformat(timespec="seconds")),
-		           Logger.OKBLUE)
-
-		channelId = fullMessage.channel.id
-		numMessages = 0
-		async with fullMessage.channel.typing():
-			async for message in fullMessage.channel.history(after=lastSyncTime):
-				if message.created_at > lastSyncTime:
-					numMessages += 1
-					await self.__UpdatePointsFrom(channelId, message)
-
-		await Screamer.Scream(fullMessage.channel, "Updated point totals of {} messages".format(numMessages))
-
+	__leaderboards = Leaderboard.LeaderboardCollection()
 	async def leaderboard(self, bot, fullMessage):
-		channelId = fullMessage.channel.id
-		if channelId not in self.__channelToLeaderboard:
-			self.__channelToLeaderboard[channelId] = {}
-			self.__channelToUserSelfPoints[channelId] = {}
-		if len(self.__channelToLeaderboard[channelId]) == 0:
-			await self.__RefreshLeaderboard(fullMessage)
-		else:
-			await self.__UpdateLeaderboard(fullMessage)
-
-		botName = bot.GetRawClient().user.name
-		userNum = 1
-		userPoints = [(user, points) for user, points in sorted(self.__channelToLeaderboard[channelId].items(), key=lambda item: -item[1]) if user != botName]
-		longestName = max([len(user) for user, _ in userPoints])
-		output = "Here you go:\n```"
-		for user, points in userPoints:
-			selfPointsString = ""
-			if self.__channelToUserSelfPoints[channelId][user] != 0:
-				selfPointsString = "({} self votes)".format(self.__channelToUserSelfPoints[channelId][user])
-
-			additionalSpaces = " " * (longestName - len(user) + 1)
-			output += f"{userNum}    {user}{additionalSpaces}: {points} points {selfPointsString}\n"
-			userNum += 1
-		output += "```"
-
-		await Screamer.Scream(fullMessage.channel, output)
+		await self.__leaderboards.PrintMessageAuthorPoints(bot, fullMessage.channel)
 
 
 	######################
