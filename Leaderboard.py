@@ -83,10 +83,10 @@ class PointCounter(Generic[T]):
 		return message.author.id in reactionUsers
 
 	async def GetCountsFrom(self, message: discord.Message, reaction: discord.Reaction) -> T:
-		pass ## Implemented by children. Ugh, template method pattern sucks, especially in Python
+		raise NotImplementedError("Unimplemented in parent")
 
 	def GetT(self) -> T:
-		raise TypeError("Unimplemented in parent")
+		raise NotImplementedError("Unimplemented in parent")
 
 class MessageAuthorUpvoteCounter(PointCounter[SelfAndTotalPoints]):
 	def __init__(self):

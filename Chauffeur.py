@@ -1,28 +1,24 @@
 #!/usr/bin/python3
 
-import asyncio, datetime, discord, os, traceback
+import asyncio, datetime, discord, importlib, os, traceback
 from types import ModuleType
-
-try:
-    from importlib import reload  # Python 3.4+
-except ImportError:
-    from imp import reload
 
 import Logger, MessageHandling, Screamer
 ReloadableImports = [ Logger, MessageHandling, Screamer ]
 
 def ReloadReloadableModule(module, alreadyReloaded):
 	Logger.Log("Reloading {}".format(module.__name__), Logger.HEADER)
-	reload(module)
+	importlib.reload(module)
 	alreadyReloaded.add(module)
 	if not hasattr(module, "ReloadableImports"):
 		return
 	for dependency in module.ReloadableImports:
 		ReloadReloadableModule(dependency, alreadyReloaded)
 
-class API:
+class Environment:
 	ClientId = os.getenv("BOTTY_ID")
 	BotToken = os.getenv("BOTTY_TOKEN")
+	AdminId = os.getenv("BOTTY_ADMIN_ID") ## Discord ID of the admin who can reload, exit, etc.
 
 class Chauffeur(discord.Client):
 	__lastReloadSuccessful = True
@@ -66,7 +62,7 @@ class Chauffeur(discord.Client):
 		return reloaded
 
 	def __LoadHandlers(self):
-		self.__dispatcher = MessageHandling.CommandDispatcher(API.ClientId, self)
+		self.__dispatcher = MessageHandling.CommandDispatcher(Environment.ClientId, self)
 
 	def __GetHandlerLoadIssues(self):
 		return [self.__dispatcher.GetLoadIssue()]
@@ -82,7 +78,7 @@ class Chauffeur(discord.Client):
 
 	## The only one who can send "reload" and "exit" commands
 	def GetMasterId(self):
-		return "184456961255800832"
+		return Environment.AdminId
 
 	async def on_ready(self):
 		Logger.Log("Successfully logged in as '{}'".format(self.user), Logger.SUCCESS)
@@ -98,6 +94,7 @@ class Chauffeur(discord.Client):
 				await self.__HandleReload(message.channel)
 			elif self.__dispatcher.ShouldExit(message):
 				await Screamer.Scream(message.channel, "Goodbye! <3")
+				Logger.Log("Exiting", Logger.OKBLUE)
 				await self.close()
 			elif self.__dispatcher.ShouldDispatchMessage(message):
 				if self.__lastReloadSuccessful:
@@ -109,13 +106,12 @@ class Chauffeur(discord.Client):
 			await Screamer.Scream(message.channel, "Whoops, I hit some unforeseen exception. Check the output for more information.")
 		
 if __name__ == '__main__':
-	print("\n\n")
+	print("\n==========\n")
 	Logger.Log(f"Using discordpy version {discord.__version__}", Logger.HEADER)
-	if all([API.ClientId, API.BotToken]):
+	if all([Environment.ClientId, Environment.BotToken, Environment.AdminId]):
 		chauffeur = Chauffeur()
-		chauffeur.run(API.BotToken)
+		chauffeur.run(Environment.BotToken)
 	else:
-		print("This app requires the environment variables BOTTY_ID and BOTTY_TOKEN.\n"
-		      "Please export those tokens with the corresponding information for your bot.\n"
-		      "Exiting.")
-
+		Logger.Log("This app requires the environment variables BOTTY_ID and BOTTY_TOKEN.", Logger.ERROR)
+		Logger.Log("It also requires a BOTTY_ADMIN_ID to refer to the Discord user who can exit, reload, etc.", Logger.ERROR)
+		Logger.Log("Please export those tokens with the corresponding information for your bot.", Logger.ERROR)
