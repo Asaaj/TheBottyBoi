@@ -65,7 +65,7 @@ class CommandMapValidator:
 			for cmdDef in self.__cmdMap:
 				self.__ValidateCmd(cmdDef)
 		except Exception as e:
-			Logger.Log(self.__FormatLog("Command map validation failed"), Logger.FAIL)
+			Logger.Log(self.__FormatLog("Command map validation failed"), Logger.ERROR)
 			raise e
 		Logger.Log(self.__FormatLog("Command map validation successful"), Logger.SUCCESS)
 

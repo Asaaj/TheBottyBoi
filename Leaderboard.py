@@ -72,7 +72,7 @@ class PointCounter(Generic[T]):
 	async def __GetReactionFromMessage(self, message: discord.Message) -> discord.Reaction:
 		emoji = [r for r in message.reactions if hasattr(r.emoji, "name") and r.emoji.name == self.__emojiName]
 		if len(emoji) > 1:
-			Logger.Log(f"Found {len(emoji)} reactions of the same name, somehow! Not sure what to do", Logger.FAIL)
+			Logger.Log(f"Found {len(emoji)} reactions of the same name, somehow! Not sure what to do", Logger.ERROR)
 			return None
 		return emoji[0] if len(emoji) == 1 else None
 
@@ -85,7 +85,7 @@ class PointCounter(Generic[T]):
 	async def GetCountsFrom(self, message: discord.Message, reaction: discord.Reaction) -> T:
 		pass ## Implemented by children. Ugh, template method pattern sucks, especially in Python
 
-	def GetT(self):
+	def GetT(self) -> T:
 		raise TypeError("Unimplemented in parent")
 
 class MessageAuthorUpvoteCounter(PointCounter[SelfAndTotalPoints]):
@@ -198,7 +198,7 @@ class LeaderboardCollection:
 
 		self.__channelIdToLeaderboard[channel.id] = thisBoard
 		Logger.Log("Leaderboard rebuild successful", Logger.SUCCESS)
-		await Screamer.Scream(channel, "Updated point totals of {} messages".format(numMessages))
+		await Screamer.Scream(channel, "Updated point totals of {} messages.".format(numMessages))
 
 	async def __UpdateLeaderboard(self, channel: discord.TextChannel):
 		thisBoard = self.__channelIdToLeaderboard[channel.id]
@@ -216,11 +216,11 @@ class LeaderboardCollection:
 					numMessages += 1
 					await thisBoard.AddCount(message)
 				else:
-					Logger.Log(f"I don't think (after=) works how I expect: {Logger.GetFormattedMessage(message)}", Logger.FAIL)
+					Logger.Log(f"I don't think (after=) works how I expect: {Logger.GetFormattedMessage(message)}", Logger.ERROR)
 
 		self.__channelIdToLeaderboard[channel.id] = thisBoard
 		Logger.Log("Leaderboard update successful", Logger.SUCCESS)
-		await Screamer.Scream(channel, "Updated point totals of {} messages".format(numMessages))
+		await Screamer.Scream(channel, "Updated point totals of {} messages.".format(numMessages))
 
 	async def __OutputLeaderboard(self, channel: discord.TextChannel, botClient: discord.Client, toPrint: dict):
 		botId = botClient.user.id

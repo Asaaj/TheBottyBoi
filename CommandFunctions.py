@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import asyncio, datetime, discord, json, os, random, re, time, youtube_dl
+import asyncio, discord, json, os, re, time, traceback, youtube_dl
 
 import Leaderboard, Logger, Screamer
 ReloadableImports = [ Leaderboard, Logger, Screamer ]
@@ -139,17 +139,16 @@ class CmdFuncs:
 	def __GetStreamFinished(self, client):
 		def __StreamFinished(self, e=None):
 			if e:
-				Logger.Log('Player error: %s' % e, Logger.FAIL)
+				Logger.Log("Player error: %s" % e, Logger.ERROR)
 			else:
 				try:
 					asyncio.ensure_future(self.Cleanup(client))
-				except:
-					pass
+				except Exception as e:
+					Logger.Log(f"Exception when cleaning up player! {str(e)}", Logger.ERROR)
+					Logger.Log(traceback.format_exc(), Logger.ERROR)
 		return __StreamFinished
 
 	async def play(self, client, fullMessage, url):
-		# await Screamer.Scream(fullMessage.channel, "This service is temporarily unavailable because Jacob hasn't had time to debug. <3")
-
 		if self.__voiceClient is not None and self.__voiceClient.is_playing():
 			self.__voiceClient.stop()
 		if self.__voiceClient is None:
@@ -166,7 +165,7 @@ class CmdFuncs:
 
 			except Exception as e:
 				await Screamer.Scream(fullMessage.channel, "Hmm, something went wrong with playback. Invalid search or URL, maybe? Check the output for more information.")
-				Logger.Log("EXCEPTION: " + str(e), Logger.FAIL)
+				Logger.Log("EXCEPTION: " + str(e), Logger.ERROR)
 				await self.Cleanup(client)
 
 	async def volume(self, client, fullMessage, percent):
@@ -202,13 +201,13 @@ class CmdFuncs:
 	async def __GetDrinkingGameChannel(self, fullMessage):
 		guild = fullMessage.guild
 		if guild is None:
-			Logger.Log("Message had no associated guild. Cannot get a drinking game channel", Logger.FAIL)
+			Logger.Log("Message had no associated guild. Cannot get a drinking game channel", Logger.ERROR)
 			return None
 
 		channels = guild.text_channels
 		channel = next((c for c in channels if c.name == self.__drinkingGameChannel), None)
 		if channel is None:
-			Logger.Log(f"Couldn't find #{self.__drinkingGameChannel}", Logger.FAIL)
+			Logger.Log(f"Couldn't find #{self.__drinkingGameChannel}", Logger.ERROR)
 			await Screamer.Scream(fullMessage.channel, f"Sorry, I couldn't find a channel called #{self.__drinkingGameChannel}.")
 		else:
 			Logger.Log(f"Found channel #{channel.name}", Logger.SUCCESS)
@@ -303,7 +302,3 @@ class CmdFuncs:
 			gameToRulesMap = await self.__GetDrinkingGameMap(fullMessage)
 			for singleGame in [g for g in gameToRulesMap if g != self.__rulesThatApplyToAll]:
 				await self.__OutputRulesForOneGame(fullMessage, singleGame)
-
-
-	async def allrules(self, fullMessage):
-		pass

@@ -36,7 +36,7 @@ class Chauffeur(discord.Client):
 			handlerLoadIssues = self.__GetHandlerLoadIssues()
 			if any(handlerLoadIssues):
 				await Screamer.Scream(channel, "There was a problem loading the message handlers. I will only respond to the 'reload' command until the errors are resolved. See the log for more details.")
-				Logger.Log("Problems with reload!", Logger.FAIL)
+				Logger.Log("Problems with reload!", Logger.ERROR)
 				for problem in [p for p in handlerLoadIssues if p]:
 					Logger.Log(str(problem), Logger.WARNING)
 				self.__lastReloadSuccessful = False
@@ -44,9 +44,8 @@ class Chauffeur(discord.Client):
 
 		except Exception as e:
 			await Screamer.Scream(channel, "An exception was thrown while reloading. I will only respond to to the 'reload' command until the errors are resolved. See the log for more details.")
-			tracebackString = ''.join(traceback.format_exception(etype=type(e), value=e, tb=e.__traceback__))
-			Logger.Log("EXCEPTION: " + str(e), Logger.FAIL)
-			Logger.Log(tracebackString, Logger.FAIL)
+			Logger.Log("EXCEPTION: " + str(e), Logger.ERROR)
+			Logger.Log(traceback.format_exc(), Logger.ERROR)
 			self.__lastReloadSuccessful = False
 			failedThisTime = True
 
@@ -75,7 +74,7 @@ class Chauffeur(discord.Client):
 	async def __SendDm(self, userId, message):
 		userObject = self.get_user(int(userId))
 		if userObject is None:
-			Logger.Log(f"Failed to send DM to <@{userId}>", Logger.FAIL)
+			Logger.Log(f"Failed to send DM to <@{userId}>", Logger.ERROR)
 			return
 		dmChannel = await userObject.create_dm()
 		Logger.Log(f"DM <@{userId}> <{datetime.datetime.now()}>: {message}")
@@ -106,7 +105,7 @@ class Chauffeur(discord.Client):
 				else:
 					await Screamer.Scream(message.channel, "Sorry, I can't handle commands until you correct the last reload errors.")
 		except Exception as e:
-			Logger.Log("EXCEPTION: " + str(e), Logger.FAIL)
+			Logger.Log("EXCEPTION: " + str(e), Logger.ERROR)
 			await Screamer.Scream(message.channel, "Whoops, I hit some unforeseen exception. Check the output for more information.")
 		
 if __name__ == '__main__':

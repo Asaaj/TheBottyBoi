@@ -5,26 +5,28 @@ HEADER = "\033[95m"
 BLUE = "\033[94m"
 OKBLUE = BLUE + "- "
 
+CHECK = u"\u2713"
 GREEN = "\033[92m"
-SUCCESS = GREEN + u"\u2713 "
+SUCCESS = GREEN + CHECK + " "
 
 YELLOW = "\033[93m"
 WARNING = YELLOW + "! "
 
+X = u"\u2717"
 RED = "\033[91m"
-FAIL = RED + u"\u2717 "
+ERROR = RED + X + " "
 
 END = "\033[0m"
 
 BOLD = "\033[1m"
 UNDERLINE = "\033[4m"
 
-__OverridingColors__ = [OKBLUE, SUCCESS, WARNING, FAIL]
+__OverridingColors__ = [OKBLUE, SUCCESS, WARNING, ERROR]
 __OverridingToPlainColor__ = {
 	OKBLUE: BLUE,
 	SUCCESS: GREEN,
 	WARNING: YELLOW,
-	FAIL: RED
+	ERROR: RED
 }
 
 def AsHeader(message):
@@ -74,7 +76,7 @@ def Log(message, colors=''):
 		output = output + END
 
 	timestampColor = BLUE
-	if FAIL in colors:
+	if ERROR in colors:
 		timestampColor = RED + BOLD
 
 	timestampText = "[" + GetFormattedTime() + "] "
