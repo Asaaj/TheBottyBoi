@@ -71,7 +71,7 @@ class Chauffeur(discord.Client):
 		return [self.__dispatcher.GetLoadIssue()]
 
 	async def __SendDm(self, userId, message):
-		userObject = self.get_user(int(userId))
+		userObject = await self.fetch_user(int(userId))
 		if userObject is None:
 			Logger.Log(f"Failed to send DM to <@{userId}>", Logger.ERROR)
 			return

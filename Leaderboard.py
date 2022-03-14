@@ -197,7 +197,7 @@ class LeaderboardCollection:
 		thisBoard.LastUtcSyncTime = datetime.datetime.utcnow()
 		numMessages = 0
 		async with channel.typing():
-			async for message in channel.history(limit=10000, after=thisBoard.EarliestVote):
+			async for message in channel.history(limit=10000, after=thisBoard.EarliestVote, oldest_first=False):
 				numMessages += 1
 				await thisBoard.AddCount(message)
 
@@ -216,7 +216,7 @@ class LeaderboardCollection:
 
 		numMessages = 0
 		async with channel.typing():
-			async for message in channel.history(after=lastUtcSyncTime):
+			async for message in channel.history(after=lastUtcSyncTime, oldest_first=False):
 				if message.created_at > lastUtcSyncTime:
 					numMessages += 1
 					await thisBoard.AddCount(message)
@@ -231,7 +231,7 @@ class LeaderboardCollection:
 		botId = botClient.user.id
 		userNum = 1
 
-		sortedNamesToPoints = [(botClient.get_user(userId).name, points) for userId, points in \
+		sortedNamesToPoints = [((await botClient.fetch_user(userId)).name, points) for userId, points in \
 			sorted(toPrint.items(), key=lambda item: item[1], reverse=True) \
 			if userId != botId]
 
