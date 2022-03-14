@@ -185,6 +185,9 @@ class CmdFuncs:
 	async def leaderboard(self, bot, fullMessage):
 		await self.__leaderboards.PrintMessageAuthorPoints(bot, fullMessage.channel)
 
+	## Dev-only
+	async def cache(self, bot, fullMessage):
+		await self.__leaderboards.CacheChannel(bot, fullMessage.channel)
 
 	######################
 	### Drinking Games ###

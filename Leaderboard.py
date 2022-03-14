@@ -1,9 +1,14 @@
 #!/usr/bin/python3
-import asyncio, datetime, discord, random
+import asyncio, datetime, discord, os, pathlib, random
 from typing import TypeVar, Generic
 
-import Logger, Screamer
-ReloadableImports = [ Logger, Screamer ]
+try:
+	import cPickle as pickle
+except ModuleNotFoundError:
+	import pickle
+
+import Logger, FlatStructures, Screamer
+ReloadableImports = [ Logger, FlatStructures, Screamer ]
 
 class SelfAndTotalPoints:
 	def __init__(self):
@@ -156,22 +161,22 @@ class ChannelLeaderboard:
 		self.MessageAuthorPointCounters = MessageAuthorPointCounters()
 		self.LastUtcSyncTime = None
 
-	async def AddCount(self, message: discord.Message):
+	async def AddCount(self, message: discord.Message) -> None:
 		await self.MessageAuthorPointCounters.Count(message)
 
-	def GetMessageAuthorPoints(self):
+	def GetMessageAuthorPoints(self) -> dict:
 		return self.MessageAuthorPointCounters.GetUserIdToPoints()
 
 class LeaderboardCollection:
 	__channelIdToLeaderboard = {}
 
-	async def PrintMessageAuthorPoints(self, bot, channel: discord.TextChannel):
+	async def PrintMessageAuthorPoints(self, bot, channel: discord.TextChannel) -> None:
 		await self.__BuildLeaderboard(channel)
 
 		toPrint = self.__channelIdToLeaderboard[channel.id].GetMessageAuthorPoints()
 		await self.__OutputLeaderboard(channel, bot.GetRawClient(), toPrint)
 
-	async def __BuildLeaderboard(self, channel: discord.TextChannel):
+	async def __BuildLeaderboard(self, channel: discord.TextChannel) -> None:
 		if channel.id not in self.__channelIdToLeaderboard:
 			self.__InitLeaderboard(channel.id)
 
@@ -180,12 +185,12 @@ class LeaderboardCollection:
 		else:
 			await self.__UpdateLeaderboard(channel)
 
-	def __InitLeaderboard(self, channelId):
+	def __InitLeaderboard(self, channelId) -> None:
 		self.__channelIdToLeaderboard[channelId] = ChannelLeaderboard()
 
 
 	## TODO: Create and update could be consolidated if I set LastUtcSyncTime to EarliestVote by default
-	async def __CreateLeaderboardFromScratch(self, channel):
+	async def __CreateLeaderboardFromScratch(self, channel: discord.TextChannel) -> None:
 		await Screamer.Scream(channel, "One second, this might take a while...")
 
 		thisBoard = self.__channelIdToLeaderboard[channel.id]
@@ -200,7 +205,7 @@ class LeaderboardCollection:
 		Logger.Log("Leaderboard rebuild successful", Logger.SUCCESS)
 		await Screamer.Scream(channel, "Updated point totals of {} messages.".format(numMessages))
 
-	async def __UpdateLeaderboard(self, channel: discord.TextChannel):
+	async def __UpdateLeaderboard(self, channel: discord.TextChannel) -> None:
 		thisBoard = self.__channelIdToLeaderboard[channel.id]
 		lastUtcSyncTime = thisBoard.LastUtcSyncTime
 		thisBoard.LastUtcSyncTime = datetime.datetime.utcnow()
@@ -222,7 +227,7 @@ class LeaderboardCollection:
 		Logger.Log("Leaderboard update successful", Logger.SUCCESS)
 		await Screamer.Scream(channel, "Updated point totals of {} messages.".format(numMessages))
 
-	async def __OutputLeaderboard(self, channel: discord.TextChannel, botClient: discord.Client, toPrint: dict):
+	async def __OutputLeaderboard(self, channel: discord.TextChannel, botClient: discord.Client, toPrint: dict) -> None:
 		botId = botClient.user.id
 		userNum = 1
 
@@ -239,3 +244,48 @@ class LeaderboardCollection:
 		output += "```"
 
 		await Screamer.Scream(channel, output)
+
+
+	async def CacheChannel(self, bot, channel: discord.TextChannel) -> None:
+		cacheFile = self.__CreateCacheDirectories(channel)
+
+		if cacheFile.exists():
+			Logger.Log("Cache file exists. Loading...", Logger.ERROR) ## TODO
+		else:
+			await self.__CreateNewCacheFile(channel, cacheFile)
+
+	def __CreateCacheDirectories(self, channel: discord.TextChannel) -> pathlib.Path:
+		cachesPrefix = f"caches/discordpy_{discord.__version__}"
+
+		channelCacheName = str(channel.id)
+		if hasattr(channel, "guild"):
+			guildPath = str(channel.guild.id)
+			channelReadableName = channel.name
+		else:
+			guildPath = channelCacheName
+			channelReadableName = f"<{channel.recipient.name}>"
+
+		cacheLocation = pathlib.Path(f"{cachesPrefix}/{guildPath}")
+		cacheFile = pathlib.Path(cacheLocation / channelCacheName)
+
+		Logger.Log(f"Building cache for channel #{channelReadableName} ({cacheFile})", Logger.HEADER)
+		cacheLocation.mkdir(parents=True, exist_ok=True)
+
+		return cacheFile
+
+	async def __CreateNewCacheFile(self, channel: discord.TextChannel, cacheFile: pathlib.Path):
+		Logger.Log("Creating a new cache file...", Logger.OKBLUE)
+
+		with open(cacheFile, "wb") as cache:
+			pickler = pickle.Pickler(cache, -1)
+			numMessages = 0
+			async with channel.typing():
+				allHistory = await channel.history(limit=100000).flatten()
+				for message in allHistory:
+					numMessages += 1
+					self.__SaveMessage(pickler, message)
+
+		Logger.Log(f"Saved cache file of {numMessages} messages", Logger.SUCCESS)
+
+	def __SaveMessage(self, pickler, message: discord.Message):
+		pickler.dump(message) ## Why is this breaking???

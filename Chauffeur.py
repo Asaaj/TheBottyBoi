@@ -6,14 +6,17 @@ from types import ModuleType
 import Logger, MessageHandling, Screamer
 ReloadableImports = [ Logger, MessageHandling, Screamer ]
 
-def ReloadReloadableModule(module, alreadyReloaded):
+def ReloadReloadableModule(module) -> set:
 	Logger.Log("Reloading {}".format(module.__name__), Logger.HEADER)
+	alreadyReloaded = { module }
+	if not hasattr(module, "ReloadableImports"):
+		return alreadyReloaded
+	for dependency in module.ReloadableImports:
+		alreadyReloaded |= ReloadReloadableModule(dependency)
+		
 	importlib.reload(module)
 	alreadyReloaded.add(module)
-	if not hasattr(module, "ReloadableImports"):
-		return
-	for dependency in module.ReloadableImports:
-		ReloadReloadableModule(dependency, alreadyReloaded)
+	return alreadyReloaded
 
 class Environment:
 	ClientId = os.getenv("BOTTY_ID")
@@ -58,7 +61,7 @@ class Chauffeur(discord.Client):
 	def __ReloadModules(self):
 		reloaded = set()
 		for mod in ReloadableImports:
-			ReloadReloadableModule(mod, reloaded)
+			reloaded |= ReloadReloadableModule(mod)
 		return reloaded
 
 	def __LoadHandlers(self):
@@ -78,6 +81,8 @@ class Chauffeur(discord.Client):
 
 	## The only one who can send "reload" and "exit" commands
 	def GetMasterId(self):
+		if Environment.AdminId is None:
+			Logger.Log("BOTTY_ADMIN_ID environment variable is apparently not set!", Logger.ERROR)
 		return Environment.AdminId
 
 	async def on_ready(self):

@@ -87,6 +87,12 @@
 
 		
 		{
+			"cmd": "cache",
+			"type": "function",
+			"requires_bot": true,
+			"hidden": true
+		},
+		{
 			"cmd": "update",
 			"type": "function",
 			"requires_bot": true,
