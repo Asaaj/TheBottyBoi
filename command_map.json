@@ -89,6 +89,7 @@
 		{
 			"cmd": "cache",
 			"type": "function",
+			"args": [ "[force_rebuild]" ],
 			"requires_bot": true,
 			"hidden": true
 		},

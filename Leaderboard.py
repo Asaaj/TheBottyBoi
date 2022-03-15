@@ -2,13 +2,25 @@
 import asyncio, datetime, discord, os, pathlib, random
 from typing import TypeVar, Generic
 
-try:
-	import cPickle as pickle
-except ModuleNotFoundError:
-	import pickle
-
 import Logger, FlatStructures, Screamer
 ReloadableImports = [ Logger, FlatStructures, Screamer ]
+
+try:
+	import dill as pickle
+except ModuleNotFoundError:
+	import pickle
+	Logger.Log("Couldn't find pickle alternative; using the normal one", Logger.WARNING)
+
+def LoadAllFromCache(cacheFile) -> list:
+	loaded = []
+	with open(cacheFile, "rb") as f:
+		unpickler = pickle.Unpickler(f)
+		while True:
+			try:
+				loaded.append(unpickler.load())
+			except EOFError:
+				break
+	return loaded
 
 class SelfAndTotalPoints:
 	def __init__(self):
@@ -153,6 +165,39 @@ class MessageAuthorPointCounters:
 	def GetUserIdToPoints(self) -> dict:
 		return (self.UpvoteCounter + self.DownvoteCounter + self.RandomCounter).UserIdToPoints
 
+class SerializableMessage:
+	@staticmethod
+	async def create(original: discord.Message):
+		reactions = [await SerializableReaction.create(r) for r in original.reactions]
+		return SerializableMessage(original, reactions)
+
+	def __init__(self, original: discord.Message, reactions: list):
+		self.id = original.id
+		self.authorId = original.author.id
+		self.content = original.content
+		self.reactions = reactions
+		self.created_at = original.created_at
+		self.edited_at = original.edited_at
+		self.jump_url = original.jump_url
+
+class SerializableReaction:
+	@staticmethod
+	async def create(original: discord.Reaction):
+		userIds = [u.id for u in await original.users().flatten()]
+		return SerializableReaction(original, userIds)
+
+	def __init__(self, original: discord.Reaction, userIds: list):
+		self.emoji = SerializableEmoji(original.emoji)
+		self.count = original.count
+		self.custom_emoji = original.custom_emoji
+		self.userIds = userIds
+
+class SerializableEmoji:
+	def __init__(self, original: discord.Emoji):
+		self.name = original.name
+		self.id = original.id
+		# self.url = original.url # TODO
+
 class ChannelLeaderboard:
 	## Never go look before this, because voting didn't exist then
 	EarliestVote = datetime.datetime(2020, 1, 30)
@@ -246,13 +291,13 @@ class LeaderboardCollection:
 		await Screamer.Scream(channel, output)
 
 
-	async def CacheChannel(self, bot, channel: discord.TextChannel) -> None:
+	async def CacheChannel(self, bot, channel: discord.TextChannel, force_rebuild) -> None:
 		cacheFile = self.__CreateCacheDirectories(channel)
 
-		if cacheFile.exists():
-			Logger.Log("Cache file exists. Loading...", Logger.ERROR) ## TODO
+		if not cacheFile.exists() or force_rebuild:
+			cached = await self.__CreateNewCacheFile(channel, cacheFile)
 		else:
-			await self.__CreateNewCacheFile(channel, cacheFile)
+			cached = await self.__LoadAndUpdateCacheFile(channel, cacheFile)
 
 	def __CreateCacheDirectories(self, channel: discord.TextChannel) -> pathlib.Path:
 		cachesPrefix = f"caches/discordpy_{discord.__version__}"
@@ -273,19 +318,39 @@ class LeaderboardCollection:
 
 		return cacheFile
 
-	async def __CreateNewCacheFile(self, channel: discord.TextChannel, cacheFile: pathlib.Path):
+	async def __CreateNewCacheFile(self, channel: discord.TextChannel, cacheFile: pathlib.Path) -> list:
 		Logger.Log("Creating a new cache file...", Logger.OKBLUE)
 
 		with open(cacheFile, "wb") as cache:
+			saved = []
 			pickler = pickle.Pickler(cache, -1)
 			numMessages = 0
-			async with channel.typing():
-				allHistory = await channel.history(limit=100000).flatten()
-				for message in allHistory:
-					numMessages += 1
-					self.__SaveMessage(pickler, message)
+			#async with channel.typing():
+			async for message in channel.history(limit=1000): # TODO: 100'000
+				numMessages += 1
+				saved.append(await self.__SaveMessage(pickler, message))
 
 		Logger.Log(f"Saved cache file of {numMessages} messages", Logger.SUCCESS)
+		return saved
 
-	def __SaveMessage(self, pickler, message: discord.Message):
-		pickler.dump(message) ## Why is this breaking???
+	async def __LoadAndUpdateCacheFile(self, channel: discord.TextChannel, cacheFile: pathlib.Path) -> list:
+		Logger.Log("Updating cache file...", Logger.OKBLUE)
+
+		try:
+			loaded = LoadAllFromCache(cacheFile)
+			Logger.Log(f"Loaded {len(loaded)} messages from cache", Logger.SUCCESS)
+			
+			#Logger.Log(f"{loaded}")
+
+			## TODO: UPDATE
+
+		except pickle.UnpicklingError:
+			Logger.Log("Failed to load cache file! Maybe something changed. Recreating", Logger.ERROR)
+			loaded = await self.__CreateNewCacheFile(channel, cacheFile)
+
+		return loaded
+
+	async def __SaveMessage(self, pickler, message: discord.Message) -> SerializableMessage:
+		serializable = await SerializableMessage.create(message)
+		pickler.dump(serializable)
+		return serializable

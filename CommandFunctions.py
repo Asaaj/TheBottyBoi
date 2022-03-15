@@ -186,8 +186,8 @@ class CmdFuncs:
 		await self.__leaderboards.PrintMessageAuthorPoints(bot, fullMessage.channel)
 
 	## Dev-only
-	async def cache(self, bot, fullMessage):
-		await self.__leaderboards.CacheChannel(bot, fullMessage.channel)
+	async def cache(self, bot, fullMessage, force_rebuild=False):
+		await self.__leaderboards.CacheChannel(bot, fullMessage.channel, force_rebuild)
 
 	######################
 	### Drinking Games ###
