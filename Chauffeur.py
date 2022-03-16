@@ -21,7 +21,6 @@ def ReloadReloadableModule(module) -> set:
 class Environment:
 	ClientId = os.getenv("BOTTY_ID")
 	BotToken = os.getenv("BOTTY_TOKEN")
-	AdminId = os.getenv("BOTTY_ADMIN_ID") ## Discord ID of the admin who can reload, exit, etc.
 
 class Chauffeur(discord.Client):
 	__lastReloadSuccessful = True
@@ -70,28 +69,13 @@ class Chauffeur(discord.Client):
 	def __GetHandlerLoadIssues(self):
 		return [self.__dispatcher.GetLoadIssue()]
 
-	async def __SendDm(self, userId, message):
-		userObject = await self.fetch_user(int(userId))
-		if userObject is None:
-			Logger.Log(f"Failed to send DM to <@{userId}>", Logger.ERROR)
-			return
-		dmChannel = await userObject.create_dm()
-		Logger.Log(f"DM <@{userId}> <{datetime.datetime.now()}>: {message}")
-		await dmChannel.send(message)
-
-	## The only one who can send "reload" and "exit" commands
-	def GetMasterId(self):
-		if Environment.AdminId is None:
-			Logger.Log("BOTTY_ADMIN_ID environment variable is apparently not set!", Logger.ERROR)
-		return Environment.AdminId
-
 	async def on_ready(self):
 		Logger.Log("Successfully logged in as '{}'".format(self.user), Logger.SUCCESS)
 		Logger.Log("Time: " + str(datetime.datetime.now()))
 		Logger.Log("Channels: " + str([c.name for c in list(self.get_all_channels())]))
 		self.__LoadHandlers()
 
-		await self.__SendDm(self.GetMasterId(), f"Logged in at {datetime.datetime.now()}")
+		await self.__dispatcher.AlertAdmins(f"Logged in at {datetime.datetime.now()}")
 
 	async def on_message(self, message):
 		try:
@@ -113,10 +97,10 @@ class Chauffeur(discord.Client):
 if __name__ == '__main__':
 	print("\n==========\n")
 	Logger.Log(f"Using discordpy version {discord.__version__}", Logger.HEADER)
-	if all([Environment.ClientId, Environment.BotToken, Environment.AdminId]):
+	if all([Environment.ClientId, Environment.BotToken, MessageHandling.Environment.AdminIdFile]):
 		chauffeur = Chauffeur()
 		chauffeur.run(Environment.BotToken)
 	else:
 		Logger.Log("This app requires the environment variables BOTTY_ID and BOTTY_TOKEN.", Logger.ERROR)
-		Logger.Log("It also requires a BOTTY_ADMIN_ID to refer to the Discord user who can exit, reload, etc.", Logger.ERROR)
+		Logger.Log("It also requires a BOTTY_ADMIN_ID_FILE to refer to a file containing IDs of Discord users who can exit, reload, etc.", Logger.ERROR)
 		Logger.Log("Please export those tokens with the corresponding information for your bot.", Logger.ERROR)

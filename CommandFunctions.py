@@ -120,6 +120,9 @@ class CmdFuncs:
 			count += 1
 		self.__shouldStop = False
 
+	async def update(self, bot, fullMessage):
+		await bot.UpdateAvatar()
+		await Screamer.Scream(fullMessage.channel, "I have updated my avatar.")
 
 	##############
 	### Stream ###

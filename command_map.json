@@ -91,13 +91,15 @@
 			"type": "function",
 			"args": [ "[force_rebuild]" ],
 			"requires_bot": true,
-			"hidden": true
+			"hidden": true,
+			"admin_only": true
 		},
 		{
 			"cmd": "update",
 			"type": "function",
 			"requires_bot": true,
-			"hidden": true
+			"hidden": true,
+			"admin_only": true
 		},
 		{
 			"cmd": "kill",

@@ -19,7 +19,7 @@ class CommandStructure:
 		"reply": [ "format" ]
 	}
 
-	OptionalForAll = [ "args", "hidden" ]
+	OptionalForAll = [ "args", "hidden", "admin_only" ]
 	OptionalFor = {
 		"docreply": [ ],
 		"function": [ "requires_client", "requires_bot" ],
