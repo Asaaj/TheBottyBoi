@@ -2,25 +2,8 @@
 import asyncio, datetime, discord, os, pathlib, random
 from typing import TypeVar, Generic
 
-import Logger, FlatStructures, Screamer
-ReloadableImports = [ Logger, FlatStructures, Screamer ]
-
-try:
-	import dill as pickle
-except ModuleNotFoundError:
-	import pickle
-	Logger.Log("Couldn't find pickle alternative; using the normal one", Logger.WARNING)
-
-def LoadAllFromCache(cacheFile) -> list:
-	loaded = []
-	with open(cacheFile, "rb") as f:
-		unpickler = pickle.Unpickler(f)
-		while True:
-			try:
-				loaded.append(unpickler.load())
-			except EOFError:
-				break
-	return loaded
+import ChannelCacher, Logger, Screamer
+ReloadableImports = [ ChannelCacher, Logger, Screamer ]
 
 class SelfAndTotalPoints:
 	def __init__(self):
@@ -94,7 +77,10 @@ class PointCounter(Generic[T]):
 		return emoji[0] if len(emoji) == 1 else None
 
 	async def __GetReactionUserIds(self, reaction: discord.Reaction) -> list:
-		return [u.id for u in await reaction.users().flatten()]
+		if type(reaction) == discord.Reaction:
+			return [u.id for u in await reaction.users().flatten()]
+		elif type(reaction) == ChannelCacher.SerializableReaction:
+			return reaction.userIds
 
 	def MessageAuthorReacted(self, message: discord.Message, reactionUsers: list) -> bool:
 		return message.author.id in reactionUsers
@@ -165,39 +151,6 @@ class MessageAuthorPointCounters:
 	def GetUserIdToPoints(self) -> dict:
 		return (self.UpvoteCounter + self.DownvoteCounter + self.RandomCounter).UserIdToPoints
 
-class SerializableMessage:
-	@staticmethod
-	async def create(original: discord.Message):
-		reactions = [await SerializableReaction.create(r) for r in original.reactions]
-		return SerializableMessage(original, reactions)
-
-	def __init__(self, original: discord.Message, reactions: list):
-		self.id = original.id
-		self.authorId = original.author.id
-		self.content = original.content
-		self.reactions = reactions
-		self.created_at = original.created_at
-		self.edited_at = original.edited_at
-		self.jump_url = original.jump_url
-
-class SerializableReaction:
-	@staticmethod
-	async def create(original: discord.Reaction):
-		userIds = [u.id for u in await original.users().flatten()]
-		return SerializableReaction(original, userIds)
-
-	def __init__(self, original: discord.Reaction, userIds: list):
-		self.emoji = SerializableEmoji(original.emoji)
-		self.count = original.count
-		self.custom_emoji = original.custom_emoji
-		self.userIds = userIds
-
-class SerializableEmoji:
-	def __init__(self, original: discord.Emoji):
-		self.name = original.name
-		self.id = original.id
-		# self.url = original.url # TODO
-
 class ChannelLeaderboard:
 	## Never go look before this, because voting didn't exist then
 	EarliestVote = datetime.datetime(2020, 1, 30)
@@ -214,6 +167,7 @@ class ChannelLeaderboard:
 
 class LeaderboardCollection:
 	__channelIdToLeaderboard = {}
+	__channelCacher = ChannelCacher.ChannelCacher()
 
 	async def PrintMessageAuthorPoints(self, bot, channel: discord.TextChannel) -> None:
 		await self.__BuildLeaderboard(channel)
@@ -225,10 +179,10 @@ class LeaderboardCollection:
 		if channel.id not in self.__channelIdToLeaderboard:
 			self.__InitLeaderboard(channel.id)
 
-		if self.__channelIdToLeaderboard[channel.id].LastUtcSyncTime is None:
-			await self.__CreateLeaderboardFromScratch(channel)
-		else:
-			await self.__UpdateLeaderboard(channel)
+		#if self.__channelIdToLeaderboard[channel.id].LastUtcSyncTime is None:
+		await self.__CreateLeaderboardFromScratch(channel)
+		#else:
+		#	await self.__UpdateLeaderboard(channel)
 
 	def __InitLeaderboard(self, channelId) -> None:
 		self.__channelIdToLeaderboard[channelId] = ChannelLeaderboard()
@@ -240,9 +194,13 @@ class LeaderboardCollection:
 
 		thisBoard = self.__channelIdToLeaderboard[channel.id]
 		thisBoard.LastUtcSyncTime = datetime.datetime.utcnow()
+
+		await self.__channelCacher.Update(channel, after=thisBoard.EarliestVote)
+
 		numMessages = 0
 		async with channel.typing():
-			async for message in channel.history(limit=10000, after=thisBoard.EarliestVote, oldest_first=False):
+			# async for message in channel.history(limit=10000, after=thisBoard.EarliestVote, oldest_first=False):
+			for message in self.__channelCacher.IterateCache(channel):
 				numMessages += 1
 				await thisBoard.AddCount(message)
 
@@ -255,13 +213,16 @@ class LeaderboardCollection:
 		lastUtcSyncTime = thisBoard.LastUtcSyncTime
 		thisBoard.LastUtcSyncTime = datetime.datetime.utcnow()
 
+		await self.__channelCacher.Update(channel, after=thisBoard.EarliestVote)
+
 		formattedLast = lastUtcSyncTime.isoformat(timespec="seconds")
 		formattedNow = thisBoard.LastUtcSyncTime.isoformat(timespec="seconds")
 		Logger.Log(f"Updating leaderboard: {formattedLast} -> {formattedNow}", Logger.OKBLUE)
 
 		numMessages = 0
 		async with channel.typing():
-			async for message in channel.history(after=lastUtcSyncTime, oldest_first=False):
+			# async for message in channel.history(after=lastUtcSyncTime, oldest_first=False):
+			for message in self.__channelCacher.IterateCache(channel):
 				if message.created_at > lastUtcSyncTime:
 					numMessages += 1
 					await thisBoard.AddCount(message)
@@ -272,11 +233,17 @@ class LeaderboardCollection:
 		Logger.Log("Leaderboard update successful", Logger.SUCCESS)
 		await Screamer.Scream(channel, "Updated point totals of {} messages.".format(numMessages))
 
+	async def __UserToName(self, botClient, userId):
+		try:
+			return (await botClient.fetch_user(userId)).name
+		except:
+			return f"Unknown <{userId}>"
+
 	async def __OutputLeaderboard(self, channel: discord.TextChannel, botClient: discord.Client, toPrint: dict) -> None:
 		botId = botClient.user.id
 		userNum = 1
 
-		sortedNamesToPoints = [((await botClient.fetch_user(userId)).name, points) for userId, points in \
+		sortedNamesToPoints = [(await self.__UserToName(botClient, userId), points) for userId, points in \
 			sorted(toPrint.items(), key=lambda item: item[1], reverse=True) \
 			if userId != botId]
 
@@ -290,67 +257,6 @@ class LeaderboardCollection:
 
 		await Screamer.Scream(channel, output)
 
-
-	async def CacheChannel(self, bot, channel: discord.TextChannel, force_rebuild) -> None:
-		cacheFile = self.__CreateCacheDirectories(channel)
-
-		if not cacheFile.exists() or force_rebuild:
-			cached = await self.__CreateNewCacheFile(channel, cacheFile)
-		else:
-			cached = await self.__LoadAndUpdateCacheFile(channel, cacheFile)
-
-	def __CreateCacheDirectories(self, channel: discord.TextChannel) -> pathlib.Path:
-		cachesPrefix = f"caches/discordpy_{discord.__version__}"
-
-		channelCacheName = str(channel.id)
-		if hasattr(channel, "guild"):
-			guildPath = str(channel.guild.id)
-			channelReadableName = channel.name
-		else:
-			guildPath = channelCacheName
-			channelReadableName = f"<{channel.recipient.name}>"
-
-		cacheLocation = pathlib.Path(f"{cachesPrefix}/{guildPath}")
-		cacheFile = pathlib.Path(cacheLocation / channelCacheName)
-
-		Logger.Log(f"Building cache for channel #{channelReadableName} ({cacheFile})", Logger.HEADER)
-		cacheLocation.mkdir(parents=True, exist_ok=True)
-
-		return cacheFile
-
-	async def __CreateNewCacheFile(self, channel: discord.TextChannel, cacheFile: pathlib.Path) -> list:
-		Logger.Log("Creating a new cache file...", Logger.OKBLUE)
-
-		with open(cacheFile, "wb") as cache:
-			saved = []
-			pickler = pickle.Pickler(cache, -1)
-			numMessages = 0
-			#async with channel.typing():
-			async for message in channel.history(limit=1000): # TODO: 100'000
-				numMessages += 1
-				saved.append(await self.__SaveMessage(pickler, message))
-
-		Logger.Log(f"Saved cache file of {numMessages} messages", Logger.SUCCESS)
-		return saved
-
-	async def __LoadAndUpdateCacheFile(self, channel: discord.TextChannel, cacheFile: pathlib.Path) -> list:
-		Logger.Log("Updating cache file...", Logger.OKBLUE)
-
-		try:
-			loaded = LoadAllFromCache(cacheFile)
-			Logger.Log(f"Loaded {len(loaded)} messages from cache", Logger.SUCCESS)
-			
-			#Logger.Log(f"{loaded}")
-
-			## TODO: UPDATE
-
-		except pickle.UnpicklingError:
-			Logger.Log("Failed to load cache file! Maybe something changed. Recreating", Logger.ERROR)
-			loaded = await self.__CreateNewCacheFile(channel, cacheFile)
-
-		return loaded
-
-	async def __SaveMessage(self, pickler, message: discord.Message) -> SerializableMessage:
-		serializable = await SerializableMessage.create(message)
-		pickler.dump(serializable)
-		return serializable
+	## TODO: Not a public API
+	async def CacheChannel(self, bot, channel: discord.TextChannel, force_rebuild):
+		await self.__channelCacher.Update(bot, channel, force_rebuild)
