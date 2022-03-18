@@ -176,16 +176,16 @@ class LeaderboardCollection:
 		await self.__OutputLeaderboard(channel, bot.GetRawClient(), toPrint)
 
 	async def __BuildLeaderboard(self, channel: discord.TextChannel) -> None:
-		if channel.id not in self.__channelIdToLeaderboard:
-			self.__InitLeaderboard(channel.id)
+		#if channel.id not in self.__channelIdToLeaderboard:
+			self.__InitLeaderboard(channel)
 
 		#if self.__channelIdToLeaderboard[channel.id].LastUtcSyncTime is None:
-		await self.__CreateLeaderboardFromScratch(channel)
+			await self.__CreateLeaderboardFromScratch(channel)
 		#else:
 		#	await self.__UpdateLeaderboard(channel)
 
-	def __InitLeaderboard(self, channelId) -> None:
-		self.__channelIdToLeaderboard[channelId] = ChannelLeaderboard()
+	def __InitLeaderboard(self, channel: discord.TextChannel) -> None:
+		self.__channelIdToLeaderboard[channel.id] = ChannelLeaderboard()
 
 
 	## TODO: Create and update could be consolidated if I set LastUtcSyncTime to EarliestVote by default
@@ -199,14 +199,12 @@ class LeaderboardCollection:
 
 		numMessages = 0
 		async with channel.typing():
-			# async for message in channel.history(limit=10000, after=thisBoard.EarliestVote, oldest_first=False):
 			for message in self.__channelCacher.IterateCache(channel):
 				numMessages += 1
 				await thisBoard.AddCount(message)
 
 		self.__channelIdToLeaderboard[channel.id] = thisBoard
-		Logger.Log("Leaderboard rebuild successful", Logger.SUCCESS)
-		await Screamer.Scream(channel, "Updated point totals of {} messages.".format(numMessages))
+		Logger.Log(f"Leaderboard rebuild successful ({numMessages} messages)", Logger.SUCCESS)
 
 	async def __UpdateLeaderboard(self, channel: discord.TextChannel) -> None:
 		thisBoard = self.__channelIdToLeaderboard[channel.id]
@@ -221,7 +219,6 @@ class LeaderboardCollection:
 
 		numMessages = 0
 		async with channel.typing():
-			# async for message in channel.history(after=lastUtcSyncTime, oldest_first=False):
 			for message in self.__channelCacher.IterateCache(channel):
 				if message.created_at > lastUtcSyncTime:
 					numMessages += 1
