@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import asyncio, discord, json, os, re, time, traceback, youtube_dl
+import asyncio, discord, json, os, re, time, traceback, urllib.request, youtube_dl
 
 import Leaderboard, Logger, Screamer
 ReloadableImports = [ Leaderboard, Logger, Screamer ]
@@ -123,6 +123,10 @@ class CmdFuncs:
 	async def update(self, bot, fullMessage):
 		await bot.UpdateAvatar()
 		await Screamer.Scream(fullMessage.channel, "I have updated my avatar.")
+
+	async def ip(self, fullMessage):
+		external_ip = urllib.request.urlopen('https://checkip.amazonaws.com').read().decode('utf8')
+		await Screamer.Scream(fullMessage.channel, f"`{external_ip}`")
 
 	##############
 	### Stream ###

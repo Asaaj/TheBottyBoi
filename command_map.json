@@ -102,6 +102,12 @@
 			"admin_only": true
 		},
 		{
+			"cmd": "ip",
+			"type": "function",
+			"hidden": true,
+			"admin_only": true
+		},
+		{
 			"cmd": "kill",
 			"type": "reply",
 			"format": "Hmm... As much as {user} deserves it, I think I'll let him live.",
