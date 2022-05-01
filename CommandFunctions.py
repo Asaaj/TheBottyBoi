@@ -193,8 +193,23 @@ class CmdFuncs:
 		await self.__leaderboards.PrintMessageAuthorPoints(bot, fullMessage.channel)
 
 	## Dev-only
-	async def cache(self, bot, fullMessage, force_rebuild=False):
-		await self.__leaderboards.CacheChannel(fullMessage.channel, force_rebuild)
+	async def cache(self, client, fullMessage, force_rebuild=False, channel=None):
+		if channel is None:
+			channel = fullMessage.channel
+		else:
+			try:
+				channel = await client.fetch_channel(channel)
+			except (discord.InvalidData, discord.NotFound, discord.Forbidden):
+				await Screamer.Scream(fullMessage.channel, f"Failed to find manually-specified channel, `{channel}`")
+				return
+			except Exception as e:
+				await Screamer.Scream(fullMessage.channel, f"Unknown reason for failing to find channel `{channel}`")
+				Logger.Log(f"{e}")
+				return
+
+		async with fullMessage.channel.typing():
+			await self.__leaderboards.CacheChannel(channel, force_rebuild)
+			await Screamer.Scream(fullMessage.channel, f"Done updating cache for channel \"{channel.name}\" (`{channel}`)")
 
 	######################
 	### Drinking Games ###

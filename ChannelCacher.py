@@ -81,15 +81,21 @@ class ChannelCacher:
 		finally:
 			self.__updatingCache = False
 
-	def IterateCache(self, channel: discord.TextChannel):
+	def IterateCache(self, channel: discord.TextChannel, after: datetime.datetime):
 		cacheFile = self.__GetCacheFilePath(channel)
 		with open(cacheFile, "rb") as f:
 			unpickler = pickle.Unpickler(f)
 			while True:
 				try:
-					yield unpickler.load()
+					message = unpickler.load()
+					if message.created_at >= after:
+						yield message
 				except EOFError:
 					break
+				except Exception as e:
+					Logger.Log("Error during cache iteration!", Logger.ERROR)
+					Logger.Log(f"{e}")
+
 
 	def __GetCacheFilePath(self, channel) -> pathlib.Path:
 		cachesPrefix = f"caches/discordpy_{discord.__version__}"

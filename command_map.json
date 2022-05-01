@@ -89,8 +89,8 @@
 		{
 			"cmd": "cache",
 			"type": "function",
-			"args": [ "[force_rebuild]" ],
-			"requires_bot": true,
+			"args": [ "[force_rebuild]", "[channel]" ],
+			"requires_client": true,
 			"hidden": true,
 			"admin_only": true
 		},

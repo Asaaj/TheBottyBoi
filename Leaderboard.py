@@ -68,6 +68,9 @@ class PointCounter(Generic[T]):
 	def __InitMessageAuthor(self, message: discord.Message) -> None:
 		if message.author.id not in self.UserIdToPoints:
 			self.UserIdToPoints[message.author.id] = self.GetT()
+			# Logger.Log(f"New user: <@{message.author.id}> {message.author.name}", Logger.OKBLUE)
+			# Logger.Log(f"First message:")
+			# Logger.Log(f"{Logger.GetFormattedMessage(message)}")
 
 	async def __GetReactionFromMessage(self, message: discord.Message) -> discord.Reaction:
 		emoji = [r for r in message.reactions if hasattr(r.emoji, "name") and r.emoji.name == self.__emojiName]
@@ -199,7 +202,7 @@ class LeaderboardCollection:
 
 		numMessages = 0
 		async with channel.typing():
-			for message in self.__channelCacher.IterateCache(channel):
+			for message in self.__channelCacher.IterateCache(channel, after=thisBoard.EarliestVote):
 				numMessages += 1
 				await thisBoard.AddCount(message)
 
@@ -219,7 +222,7 @@ class LeaderboardCollection:
 
 		numMessages = 0
 		async with channel.typing():
-			for message in self.__channelCacher.IterateCache(channel):
+			for message in self.__channelCacher.IterateCache(channel, after=thisBoard.EarliestVote):
 				if message.created_at > lastUtcSyncTime:
 					numMessages += 1
 					await thisBoard.AddCount(message)
@@ -255,5 +258,5 @@ class LeaderboardCollection:
 		await Screamer.Scream(channel, output)
 
 	## TODO: Not a public API
-	async def CacheChannel(self, bot, channel: discord.TextChannel, force_rebuild):
-		await self.__channelCacher.Update(bot, channel, force_rebuild)
+	async def CacheChannel(self, channel: discord.TextChannel, force_rebuild):
+		await self.__channelCacher.Update(channel, force_rebuild)
